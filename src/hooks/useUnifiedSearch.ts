@@ -134,7 +134,7 @@ export const useUnifiedSearch = (
       serviceIds: normalizedServiceIds,
       mediaTypes: normalizedMediaTypes,
     }),
-    queryFn: () => service.search(normalizedTerm, searchOptions),
+    queryFn: ({ signal }) => service.search(normalizedTerm, searchOptions),
     enabled: (config.enabled ?? true) && normalizedTerm.length >= 2,
     // Search results are relatively short-lived; keep previous data while
     // parameters change to avoid UI flicker when typing/paging. KeepPreviousData

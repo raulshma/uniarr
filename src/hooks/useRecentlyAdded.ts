@@ -27,12 +27,13 @@ export type RecentlyAddedOverview = {
 const fetchRecentlyAdded = async (
   sonarrConnectors: SonarrConnector[],
   radarrConnectors: RadarrConnector[],
+  signal?: AbortSignal,
 ): Promise<RecentlyAddedOverview> => {
   const recentlyAddedItems: RecentlyAddedItem[] = [];
 
   for (const connector of sonarrConnectors) {
     try {
-      const series = await connector.getSeries();
+      const series = await connector.getSeries(undefined, { signal });
 
       const recentSeries = series
         .filter((s) => s.added)
@@ -62,7 +63,7 @@ const fetchRecentlyAdded = async (
 
   for (const connector of radarrConnectors) {
     try {
-      const movies = await connector.getMovies();
+      const movies = await connector.getMovies(undefined, { signal });
 
       const recentMovies = movies
         .filter((m) => m.movieFile?.dateAdded)
@@ -114,11 +115,11 @@ export const useRecentlyAdded = () => {
   ) as RadarrConnector[];
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.activity.recentlyAdded,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const manager = ConnectorManager.getInstance();
       await manager.loadSavedServices();
 
-      return fetchRecentlyAdded(sonarrConnectors, radarrConnectors);
+      return fetchRecentlyAdded(sonarrConnectors, radarrConnectors, signal);
     },
     refetchInterval: 5 * 60 * 1000,
     staleTime: 2 * 60 * 1000,

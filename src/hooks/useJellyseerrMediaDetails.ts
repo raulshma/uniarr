@@ -29,14 +29,13 @@ export const useJellyseerrMediaDetails = (
     queryKey: queryKeys.jellyseerr.mediaDetail(serviceId, mediaType, mediaId),
     enabled,
     staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!jellyseerrConnector) {
         throw new Error("Jellyseerr connector not found");
       }
-      return jellyseerrConnector.getMediaDetails(
-        mediaId,
-        mediaType,
-      ) as unknown as JellyseerrMediaDetails;
+      return jellyseerrConnector.getMediaDetails(mediaId, mediaType, {
+        signal,
+      }) as unknown as JellyseerrMediaDetails;
     },
   });
 };

@@ -86,7 +86,7 @@ export function useAggregatedHealth(options: UseAggregatedHealthOptions = {}) {
   // Query for aggregated health
   const query = useQuery({
     queryKey,
-    queryFn: async (): Promise<AggregatedHealth> => {
+    queryFn: async ({ signal }): Promise<AggregatedHealth> => {
       // Try to fetch from service
       if (isConnected) {
         try {
@@ -198,7 +198,7 @@ export function useServiceHealth(
 
   return useQuery({
     queryKey,
-    queryFn: async (): Promise<ServiceHealthDetail> => {
+    queryFn: async ({ signal }): Promise<ServiceHealthDetail> => {
       // Try to fetch from service
       if (isConnected) {
         try {

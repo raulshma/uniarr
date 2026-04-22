@@ -32,9 +32,9 @@ export const useSonarrFilterMetadata = ({
 
   const tagsQuery = useQuery({
     queryKey: queryKeys.sonarr.tags(serviceId),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!sonarrConnector) throw new Error("Connector not available");
-      return sonarrConnector.getTags();
+      return sonarrConnector.getTags({ signal });
     },
     enabled: isValidConnector,
     staleTime: 10 * 60 * 1000,
@@ -43,9 +43,9 @@ export const useSonarrFilterMetadata = ({
 
   const qualityProfilesQuery = useQuery({
     queryKey: queryKeys.sonarr.qualityProfiles(serviceId),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!sonarrConnector) throw new Error("Connector not available");
-      return sonarrConnector.getQualityProfiles();
+      return sonarrConnector.getQualityProfiles({ signal });
     },
     enabled: isValidConnector,
     staleTime: 10 * 60 * 1000,
@@ -88,9 +88,9 @@ export const useRadarrFilterMetadata = ({
 
   const tagsQuery = useQuery({
     queryKey: queryKeys.radarr.tags(serviceId),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!radarrConnector) throw new Error("Connector not available");
-      return radarrConnector.getTags();
+      return radarrConnector.getTags({ signal });
     },
     enabled: isValidConnector,
     staleTime: 10 * 60 * 1000,
@@ -99,9 +99,9 @@ export const useRadarrFilterMetadata = ({
 
   const qualityProfilesQuery = useQuery({
     queryKey: queryKeys.radarr.qualityProfiles(serviceId),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!radarrConnector) throw new Error("Connector not available");
-      return radarrConnector.getQualityProfiles();
+      return radarrConnector.getQualityProfiles({ signal });
     },
     enabled: isValidConnector,
     staleTime: 10 * 60 * 1000,

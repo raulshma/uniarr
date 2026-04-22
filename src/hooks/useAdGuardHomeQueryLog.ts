@@ -69,8 +69,8 @@ export const useAdGuardHomeQueryLog = (
 
   const queryLogQuery = useQuery<AdGuardQueryLogResult, Error>({
     queryKey: queryKeys.adguard.queryLog(serviceId, { hash: paramsKey }),
-    queryFn: async () => {
-      return adguardConnector.getQueryLog(sanitizedParams);
+    queryFn: async ({ signal }) => {
+      return adguardConnector.getQueryLog(sanitizedParams, { signal });
     },
     enabled: hasConnector,
     refetchOnWindowFocus: false,

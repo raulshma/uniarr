@@ -98,7 +98,7 @@ export const useCalendar = (): UseCalendarReturn => {
       state.currentDate,
       state.filters as any,
     ),
-    queryFn: async (): Promise<MediaRelease[]> => {
+    queryFn: async ({ signal }): Promise<MediaRelease[]> => {
       const calendarService = CalendarService.getInstance();
       return calendarService.getReleases(state.filters);
     },

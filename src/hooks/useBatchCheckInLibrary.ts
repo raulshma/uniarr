@@ -43,6 +43,7 @@ const checkItemsInLibrary = async (
   items: CheckItemParams[],
   radarrConnectors: RadarrConnector[],
   sonarrConnectors: SonarrConnector[],
+  signal?: AbortSignal,
 ): Promise<Map<string, FoundService>> => {
   const result = new Map<string, FoundService>();
 
@@ -57,7 +58,7 @@ const checkItemsInLibrary = async (
     if (movieItems.length > 0) {
       for (const connector of radarrConnectors) {
         try {
-          const movies = await connector.getMovies();
+          const movies = await connector.getMovies(undefined, { signal });
 
           for (const item of movieItems) {
             if (!item.tmdbId) continue;
@@ -97,7 +98,7 @@ const checkItemsInLibrary = async (
     if (seriesItems.length > 0) {
       for (const connector of sonarrConnectors) {
         try {
-          const series = await connector.getSeries();
+          const series = await connector.getSeries(undefined, { signal });
 
           for (const item of seriesItems) {
             const matchingShow = series.find(
@@ -171,8 +172,13 @@ export const useBatchCheckInLibrary = (
     queryKey: queryKeys.library.batchCheckInLibrary(
       checkItems.map((item) => `${item.id}`),
     ),
-    queryFn: async () =>
-      checkItemsInLibrary(checkItems, radarrConnectors, sonarrConnectors),
+    queryFn: async ({ signal }) =>
+      checkItemsInLibrary(
+        checkItems,
+        radarrConnectors,
+        sonarrConnectors,
+        signal,
+      ),
     enabled: items.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

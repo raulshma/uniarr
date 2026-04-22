@@ -31,7 +31,7 @@ export const useJellyfinLatestItems = ({
         ? queryKeys.jellyfin.latest(serviceId, libraryId, { limit })
         : queryKeys.jellyfin.base,
     enabled,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (
         !serviceId ||
         !libraryId ||
@@ -41,7 +41,9 @@ export const useJellyfinLatestItems = ({
         return [];
       }
 
-      return (connector as JellyfinConnector).getLatestItems(libraryId, limit);
+      return (connector as JellyfinConnector).getLatestItems(libraryId, limit, {
+        signal,
+      });
     },
   });
 };

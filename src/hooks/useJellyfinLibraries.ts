@@ -16,12 +16,12 @@ export const useJellyfinLibraries = (serviceId: string | undefined) => {
       ? queryKeys.jellyfin.libraries(serviceId)
       : queryKeys.jellyfin.base,
     enabled: Boolean(serviceId && connector?.config.type === "jellyfin"),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!serviceId || !connector || connector.config.type !== "jellyfin") {
         return [];
       }
 
-      return (connector as JellyfinConnector).getLibraries();
+      return (connector as JellyfinConnector).getLibraries({ signal });
     },
   });
 };

@@ -382,9 +382,11 @@ export class JellyseerrConnector extends BaseConnector<
     endpoint: string,
     config?: AxiosRequestConfig,
     operation?: string,
+    options?: { readonly signal?: AbortSignal },
   ) {
     return this.requestWithRetry<T>(
-      () => this.client.get<T>(endpoint, config),
+      () =>
+        this.client.get<T>(endpoint, { ...config, signal: options?.signal }),
       operation ?? "get",
       endpoint,
     );
@@ -395,9 +397,14 @@ export class JellyseerrConnector extends BaseConnector<
     data?: unknown,
     config?: AxiosRequestConfig,
     operation?: string,
+    options?: { readonly signal?: AbortSignal },
   ) {
     return this.requestWithRetry<T>(
-      () => this.client.post<T>(endpoint, data, config),
+      () =>
+        this.client.post<T>(endpoint, data, {
+          ...config,
+          signal: options?.signal,
+        }),
       operation ?? "post",
       endpoint,
     );
@@ -407,9 +414,11 @@ export class JellyseerrConnector extends BaseConnector<
     endpoint: string,
     config?: AxiosRequestConfig,
     operation?: string,
+    options?: { readonly signal?: AbortSignal },
   ) {
     return this.requestWithRetry<T>(
-      () => this.client.delete<T>(endpoint, config),
+      () =>
+        this.client.delete<T>(endpoint, { ...config, signal: options?.signal }),
       operation ?? "delete",
       endpoint,
     );
@@ -444,7 +453,12 @@ export class JellyseerrConnector extends BaseConnector<
    * Implementation-only method; resolves a TMDB id to a Sonarr internal series id.
    * @returns The Sonarr internal series id if found, undefined if not found or error occurs.
    */
-  async serviceLookupForSonarr(tmdbId: number): Promise<number | undefined> {
+  async serviceLookupForSonarr(
+    tmdbId: number,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<number | undefined> {
     await this.ensureAuthenticated();
 
     try {
@@ -452,7 +466,7 @@ export class JellyseerrConnector extends BaseConnector<
       const response = await this.getWithRetry<{
         id?: number;
         tvdbId?: number;
-      }>(endpoint, undefined, "serviceLookupForSonarr");
+      }>(endpoint, undefined, "serviceLookupForSonarr", options);
 
       if (response.data?.id && typeof response.data.id === "number") {
         logger.debug("[JellyseerrConnector] Sonarr service lookup succeeded", {
@@ -485,6 +499,7 @@ export class JellyseerrConnector extends BaseConnector<
 
   async getRequests(
     options?: JellyseerrRequestQueryOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<JellyseerrRequestList> {
     await this.ensureAuthenticated();
 
@@ -494,6 +509,7 @@ export class JellyseerrConnector extends BaseConnector<
         REQUEST_ENDPOINT,
         { params },
         "getRequests",
+        requestOptions,
       );
       let requests = mapPagedRequests(response.data);
 
@@ -518,6 +534,7 @@ export class JellyseerrConnector extends BaseConnector<
                     `${REQUEST_ENDPOINT}/${request.id}`,
                     undefined,
                     "getRequestDetails",
+                    requestOptions,
                   );
 
                 const requestPayload = requestDetails.data as ApiRequest & {
@@ -595,6 +612,7 @@ export class JellyseerrConnector extends BaseConnector<
                 const mediaDetails = await this.getMediaDetails(
                   mediaId,
                   mediaType,
+                  requestOptions,
                 );
 
                 return {
@@ -657,6 +675,7 @@ export class JellyseerrConnector extends BaseConnector<
   async getMediaDetails(
     mediaId: number,
     mediaType: "movie" | "tv",
+    options?: { readonly signal?: AbortSignal },
   ): Promise<JellyseerrMediaSummary> {
     await this.ensureAuthenticated();
 
@@ -671,6 +690,7 @@ export class JellyseerrConnector extends BaseConnector<
           endpoint,
           undefined,
           "getMediaDetails",
+          options,
         );
         return mapMediaDetails("movie", response.data);
       }
@@ -679,6 +699,7 @@ export class JellyseerrConnector extends BaseConnector<
         endpoint,
         undefined,
         "getMediaDetails",
+        options,
       );
       return mapMediaDetails("tv", response.data);
     } catch (error) {
@@ -697,6 +718,7 @@ export class JellyseerrConnector extends BaseConnector<
   async getMediaCredits(
     mediaId: number,
     mediaType: "movie" | "tv",
+    options?: { readonly signal?: AbortSignal },
   ): Promise<
     { id?: number; name?: string; character?: string; profileUrl?: string }[]
   > {
@@ -715,6 +737,7 @@ export class JellyseerrConnector extends BaseConnector<
           endpoint,
           undefined,
           "getMediaCredits",
+          options,
         );
         const cast = response.data.credits?.cast ?? [];
         return cast.map(mapCastMember);
@@ -724,6 +747,7 @@ export class JellyseerrConnector extends BaseConnector<
         endpoint,
         undefined,
         "getMediaCredits",
+        options,
       );
       const cast = response.data.credits?.cast ?? [];
       return cast.map(mapCastMember);
@@ -742,6 +766,7 @@ export class JellyseerrConnector extends BaseConnector<
 
   async createRequest(
     payload: CreateJellyseerrRequest,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<JellyseerrRequest> {
     await this.ensureAuthenticated();
 
@@ -751,6 +776,7 @@ export class JellyseerrConnector extends BaseConnector<
         buildCreatePayload(payload),
         undefined,
         "createRequest",
+        options,
       );
       return mapRequest(response.data);
     } catch (error) {
@@ -766,6 +792,7 @@ export class JellyseerrConnector extends BaseConnector<
   async approveRequest(
     requestId: number,
     options?: JellyseerrApprovalOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<JellyseerrRequest> {
     await this.ensureAuthenticated();
 
@@ -775,6 +802,7 @@ export class JellyseerrConnector extends BaseConnector<
         undefined,
         undefined,
         "approveRequest",
+        requestOptions,
       );
       return mapRequest(response.data);
     } catch (error) {
@@ -790,6 +818,7 @@ export class JellyseerrConnector extends BaseConnector<
   async declineRequest(
     requestId: number,
     options?: JellyseerrDeclineOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<JellyseerrRequest> {
     await this.ensureAuthenticated();
 
@@ -799,6 +828,7 @@ export class JellyseerrConnector extends BaseConnector<
         undefined,
         undefined,
         "declineRequest",
+        requestOptions,
       );
       return mapRequest(response.data);
     } catch (error) {
@@ -811,7 +841,12 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
-  async deleteRequest(requestId: number): Promise<boolean> {
+  async deleteRequest(
+    requestId: number,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<boolean> {
     await this.ensureAuthenticated();
 
     try {
@@ -819,6 +854,7 @@ export class JellyseerrConnector extends BaseConnector<
         `${REQUEST_ENDPOINT}/${requestId}`,
         undefined,
         "deleteRequest",
+        options,
       );
       return true;
     } catch (error) {
@@ -834,6 +870,7 @@ export class JellyseerrConnector extends BaseConnector<
   async search(
     query: string,
     options?: SearchOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<JellyseerrSearchResult[]> {
     await this.ensureAuthenticated();
 
@@ -904,10 +941,10 @@ export class JellyseerrConnector extends BaseConnector<
         SEARCH_ENDPOINT,
         {
           params,
-          // Use standard axios parameter serialization
-          timeout: 10000, // 10 second timeout for search requests
+          timeout: 10000,
         },
         "search",
+        requestOptions,
       );
 
       const results = mapSearchResults(response.data.results);
@@ -975,10 +1012,13 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
-  async getTrending(options?: {
-    page?: number;
-    language?: string;
-  }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+  async getTrending(
+    options?: {
+      page?: number;
+      language?: string;
+    },
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
     await this.ensureAuthenticated();
 
     try {
@@ -1000,6 +1040,7 @@ export class JellyseerrConnector extends BaseConnector<
           params,
         },
         "getTrending",
+        requestOptions,
       );
 
       const items = mapSearchResults(response.data.results);
@@ -1050,9 +1091,12 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
-  async getAnimeRecommendations(options?: {
-    page?: number;
-  }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+  async getAnimeRecommendations(
+    options?: {
+      page?: number;
+    },
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
     await this.ensureAuthenticated();
 
     try {
@@ -1077,6 +1121,7 @@ export class JellyseerrConnector extends BaseConnector<
           params,
         },
         "getAnimeRecommendations",
+        requestOptions,
       );
 
       const allItems = mapSearchResults(response.data.results);
@@ -1125,9 +1170,12 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
-  async getAnimeUpcoming(options?: {
-    page?: number;
-  }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+  async getAnimeUpcoming(
+    options?: {
+      page?: number;
+    },
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
     await this.ensureAuthenticated();
 
     try {
@@ -1149,6 +1197,7 @@ export class JellyseerrConnector extends BaseConnector<
           params,
         },
         "getAnimeUpcoming",
+        requestOptions,
       );
 
       const allItems = mapSearchResults(response.data.results);
@@ -1197,9 +1246,12 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
-  async getTrendingAnime(options?: {
-    page?: number;
-  }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+  async getTrendingAnime(
+    options?: {
+      page?: number;
+    },
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
     await this.ensureAuthenticated();
 
     try {
@@ -1214,6 +1266,7 @@ export class JellyseerrConnector extends BaseConnector<
           params: options,
         },
         "getTrendingAnime",
+        requestOptions,
       );
 
       const allResults = mapSearchResults(response.data.results);
@@ -1262,9 +1315,12 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
-  async getAnimeMovies(options?: {
-    page?: number;
-  }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+  async getAnimeMovies(
+    options?: {
+      page?: number;
+    },
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
     await this.ensureAuthenticated();
 
     try {
@@ -1287,6 +1343,7 @@ export class JellyseerrConnector extends BaseConnector<
           params,
         },
         "getAnimeMovies",
+        requestOptions,
       );
 
       const allItems = mapSearchResults(response.data.results);
@@ -1337,6 +1394,7 @@ export class JellyseerrConnector extends BaseConnector<
 
   async getServers(
     mediaType: "movie" | "tv",
+    options?: { readonly signal?: AbortSignal },
   ): Promise<
     | components["schemas"]["RadarrSettings"][]
     | components["schemas"]["SonarrSettings"][]
@@ -1351,7 +1409,7 @@ export class JellyseerrConnector extends BaseConnector<
       const response = await this.getWithRetry<
         | components["schemas"]["RadarrSettings"][]
         | components["schemas"]["SonarrSettings"][]
-      >(endpoint, undefined, "getServers");
+      >(endpoint, undefined, "getServers", options);
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -1366,7 +1424,13 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
-  async getProfiles(serverId: number, mediaType: "movie" | "tv"): Promise<any> {
+  async getProfiles(
+    serverId: number,
+    mediaType: "movie" | "tv",
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<any> {
     await this.ensureAuthenticated();
 
     try {
@@ -1378,6 +1442,7 @@ export class JellyseerrConnector extends BaseConnector<
         endpoint,
         undefined,
         "getProfiles",
+        options,
       );
       return response.data;
     } catch (error) {
@@ -1393,7 +1458,9 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
-  async getCurrentUser(): Promise<components["schemas"]["User"]> {
+  async getCurrentUser(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<components["schemas"]["User"]> {
     await this.ensureAuthenticated();
 
     try {
@@ -1401,6 +1468,7 @@ export class JellyseerrConnector extends BaseConnector<
         `${API_PREFIX}/auth/me`,
         undefined,
         "getCurrentUser",
+        options,
       );
       return response.data;
     } catch (error) {

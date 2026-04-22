@@ -178,7 +178,7 @@ const fetchUnifiedDiscover = async (
   jellyConnectors: JellyseerrConnector[],
   sonarrConnectors: SonarrConnector[],
   radarrConnectors: RadarrConnector[],
-  options: { tmdbEnabled: boolean },
+  options: { tmdbEnabled: boolean; signal?: AbortSignal },
 ): Promise<UnifiedDiscoverPayload> => {
   const services: UnifiedDiscoverServices = {
     sonarr: mapServiceSummaries(
@@ -195,7 +195,10 @@ const fetchUnifiedDiscover = async (
   const trendingResponses = await Promise.all(
     jellyConnectors.map(async (connector) => {
       try {
-        const response = await connector.getTrending({ page: 1 });
+        const response = await connector.getTrending(
+          { page: 1 },
+          { signal: options.signal },
+        );
         return {
           connectorId: connector.config.id,
           items: response.items,
@@ -300,8 +303,14 @@ const fetchUnifiedDiscover = async (
     if (tmdbConnector) {
       try {
         const [movieDiscover, tvDiscover] = await Promise.all([
-          tmdbConnector.discoverMovies({ sort_by: "popularity.desc", page: 1 }),
-          tmdbConnector.discoverTv({ sort_by: "popularity.desc", page: 1 }),
+          tmdbConnector.discoverMovies(
+            { sort_by: "popularity.desc", page: 1 },
+            { signal: options.signal },
+          ),
+          tmdbConnector.discoverTv(
+            { sort_by: "popularity.desc", page: 1 },
+            { signal: options.signal },
+          ),
         ]);
 
         const mapWithDedupe = (
@@ -390,13 +399,14 @@ export const useUnifiedDiscover = () => {
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const query = useQuery<UnifiedDiscoverPayload>({
     queryKey: queryKeys.discover.unified({ tmdbEnabled }),
-    queryFn: async (context) => {
+    queryFn: async ({ signal }) => {
       const payload = await fetchUnifiedDiscover(
         jellyConnectors,
         sonarrConnectors,
         radarrConnectors,
         {
           tmdbEnabled,
+          signal,
         },
       );
 

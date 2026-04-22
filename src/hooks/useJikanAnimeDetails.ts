@@ -16,7 +16,7 @@ export const useJikanAnimeDetails = (malId?: number) => {
     queryKey: queryKeys.discover.jikan.detail(numericMalId ?? 0),
     enabled: Boolean(numericMalId),
     ...QUERY_CONFIG.ANIME,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!numericMalId) {
         throw new Error("Invalid MyAnimeList id");
       }
@@ -29,9 +29,8 @@ export const useJikanAnimeDetails = (malId?: number) => {
     queryKey: queryKeys.discover.jikan.detailRecommendations(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
     ...QUERY_CONFIG.ANIME_DETAIL,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
-      // Small delay to space out requests
       await new Promise((resolve) => setTimeout(resolve, 100));
       return JikanClient.getAnimeRecommendations(numericMalId);
     },
@@ -41,9 +40,8 @@ export const useJikanAnimeDetails = (malId?: number) => {
     queryKey: queryKeys.discover.jikan.reviews(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
     ...QUERY_CONFIG.ANIME_DETAIL,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
-      // Small delay to space out requests
       await new Promise((resolve) => setTimeout(resolve, 200));
       return JikanClient.getAnimeReviews(numericMalId);
     },
@@ -53,9 +51,8 @@ export const useJikanAnimeDetails = (malId?: number) => {
     queryKey: queryKeys.discover.jikan.pictures(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
     ...QUERY_CONFIG.ANIME_DETAIL,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
-      // Small delay to space out requests
       await new Promise((resolve) => setTimeout(resolve, 300));
       return JikanClient.getAnimePictures(numericMalId);
     },
@@ -65,9 +62,8 @@ export const useJikanAnimeDetails = (malId?: number) => {
     queryKey: queryKeys.discover.jikan.episodes(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
     ...QUERY_CONFIG.ANIME_DETAIL,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
-      // Small delay to space out requests
       await new Promise((resolve) => setTimeout(resolve, 400));
       return JikanClient.getAnimeEpisodes(numericMalId);
     },
@@ -77,9 +73,8 @@ export const useJikanAnimeDetails = (malId?: number) => {
     queryKey: queryKeys.discover.jikan.statistics(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
     ...QUERY_CONFIG.ANIME_DETAIL,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
-      // Small delay to space out requests
       await new Promise((resolve) => setTimeout(resolve, 500));
       return JikanClient.getAnimeStatistics(numericMalId);
     },
@@ -89,9 +84,8 @@ export const useJikanAnimeDetails = (malId?: number) => {
     queryKey: queryKeys.discover.jikan.streaming(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
     ...QUERY_CONFIG.ANIME_DETAIL,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
-      // Small delay to space out requests
       await new Promise((resolve) => setTimeout(resolve, 600));
       return JikanClient.getAnimeStreaming(numericMalId);
     },

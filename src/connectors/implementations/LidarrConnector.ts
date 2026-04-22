@@ -12,7 +12,11 @@ import type {
   RootFolder,
   Track,
 } from "@/models/media.types";
-import type { SearchOptions, SystemHealth } from "@/connectors/base/IConnector";
+import type {
+  SearchOptions,
+  SystemHealth,
+  ConnectorRequestOptions,
+} from "@/connectors/base/IConnector";
 import { handleApiError } from "@/utils/error.utils";
 import type {
   LogQueryOptions,
@@ -95,18 +99,13 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  /**
-   * Retrieve health status and messages from Lidarr
-   */
   override async getHealth(): Promise<SystemHealth> {
     try {
       const response = await this.client.get<any[]>("/api/v1/health");
 
       const healthResources = response.data ?? [];
 
-      // Map Lidarr health resources to our HealthMessage format
       const messages: HealthMessage[] = healthResources.map((resource: any) => {
-        // Map Lidarr's HealthCheckResult to our severity levels
         const severityMap: Record<string, HealthMessageSeverity> = {
           ok: "info",
           notice: "info",
@@ -125,7 +124,6 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
         };
       });
 
-      // Determine overall status based on health messages
       const hasErrors = messages.some((m) => m.severity === "error");
       const hasWarnings = messages.some((m) => m.severity === "warning");
 
@@ -163,9 +161,14 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getArtists(): Promise<Artist[]> {
+  async getArtists(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<Artist[]> {
     try {
-      const response = await this.client.get("/api/v1/artist");
+      const response = await this.client.get(
+        "/api/v1/artist",
+        this.toAxiosConfig(options),
+      );
       return response.data.map((item: any) => this.mapArtist(item));
     } catch (error) {
       throw handleApiError(error, {
@@ -177,16 +180,21 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async search(query: string, options?: SearchOptions): Promise<Artist[]> {
+  async search(
+    query: string,
+    searchOptions?: SearchOptions,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Artist[]> {
     try {
       const params: Record<string, unknown> = { term: query };
 
-      if (options?.filters) {
-        Object.assign(params, options.filters);
+      if (searchOptions?.filters) {
+        Object.assign(params, searchOptions.filters);
       }
 
       const response = await this.client.get("/api/v1/artist/lookup", {
         params,
+        ...this.toAxiosConfig(options),
       });
 
       return response.data.map((item: any) => this.mapArtist(item));
@@ -200,19 +208,23 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getById(id: number): Promise<Artist> {
+  async getById(
+    id: number,
+    options?: ConnectorRequestOptions,
+  ): Promise<Artist> {
     try {
       const [artistResponse, albumsResponse] = await Promise.all([
-        this.client.get(`/api/v1/artist/${id}`),
+        this.client.get(`/api/v1/artist/${id}`, this.toAxiosConfig(options)),
         this.client.get("/api/v1/album", {
           params: { artistId: id, includeAllArtistAlbums: true },
+          ...this.toAxiosConfig(options),
         }),
       ]);
 
       const artistData = this.mapArtist(artistResponse.data);
       const albums = albumsResponse.data.map((album: any) => ({
         ...this.mapAlbum(album),
-        tracks: [], // Tracks loaded separately when needed
+        tracks: [],
       }));
 
       return {
@@ -229,10 +241,17 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async add(request: AddArtistRequest): Promise<Artist> {
+  async add(
+    request: AddArtistRequest,
+    options?: ConnectorRequestOptions,
+  ): Promise<Artist> {
     try {
       const payload = this.buildAddPayload(request);
-      const response = await this.client.post("/api/v1/artist", payload);
+      const response = await this.client.post(
+        "/api/v1/artist",
+        payload,
+        this.toAxiosConfig(options),
+      );
       return this.mapArtist(response.data);
     } catch (error) {
       throw handleApiError(error, {
@@ -244,12 +263,19 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async triggerSearch(artistId: number): Promise<void> {
+  async triggerSearch(
+    artistId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v1/command", {
-        name: "ArtistSearch",
-        artistId,
-      });
+      await this.client.post(
+        "/api/v1/command",
+        {
+          name: "ArtistSearch",
+          artistId,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -260,11 +286,19 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async setMonitored(artistId: number, monitored: boolean): Promise<void> {
+  async setMonitored(
+    artistId: number,
+    monitored: boolean,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.put(`/api/v1/artist/${artistId}`, {
-        monitored,
-      });
+      await this.client.put(
+        `/api/v1/artist/${artistId}`,
+        {
+          monitored,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -277,16 +311,21 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
 
   async deleteArtist(
     artistId: number,
-    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
+    deleteOptions: {
+      deleteFiles?: boolean;
+      addImportListExclusion?: boolean;
+    } = {},
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     try {
       const params = {
-        deleteFiles: options.deleteFiles ?? false,
-        addImportListExclusion: options.addImportListExclusion ?? false,
+        deleteFiles: deleteOptions.deleteFiles ?? false,
+        addImportListExclusion: deleteOptions.addImportListExclusion ?? false,
       };
 
       await this.client.delete(`/api/v1/artist/${artistId}`, {
         params,
+        ...this.toAxiosConfig(options),
       });
     } catch (error) {
       throw handleApiError(error, {
@@ -301,11 +340,13 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
   async updateArtist(
     artistId: number,
     updates: Partial<Omit<any, "id" | "statistics" | "albums">>,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<Artist> {
     try {
       const response = await this.client.put(
         `/api/v1/artist/${artistId}`,
         updates,
+        this.toAxiosConfig(options),
       );
       return this.mapArtist(response.data);
     } catch (error) {
@@ -318,12 +359,19 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async refreshArtist(artistId: number): Promise<void> {
+  async refreshArtist(
+    artistId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v1/command", {
-        name: "RefreshArtist",
-        artistId,
-      });
+      await this.client.post(
+        "/api/v1/command",
+        {
+          name: "RefreshArtist",
+          artistId,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -334,12 +382,19 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async rescanArtist(artistId: number): Promise<void> {
+  async rescanArtist(
+    artistId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v1/command", {
-        name: "RescanArtist",
-        artistId,
-      });
+      await this.client.post(
+        "/api/v1/command",
+        {
+          name: "RescanArtist",
+          artistId,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -350,14 +405,20 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getAlbums(artistId?: number): Promise<Album[]> {
+  async getAlbums(
+    artistId?: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Album[]> {
     try {
       const params: Record<string, unknown> = {};
       if (artistId) {
         params.artistId = artistId;
       }
 
-      const response = await this.client.get("/api/v1/album", { params });
+      const response = await this.client.get("/api/v1/album", {
+        params,
+        ...this.toAxiosConfig(options),
+      });
       return response.data.map((album: any) => this.mapAlbum(album));
     } catch (error) {
       throw handleApiError(error, {
@@ -369,12 +430,19 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getAlbumById(albumId: number): Promise<Album> {
+  async getAlbumById(
+    albumId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Album> {
     try {
       const [albumResponse, tracksResponse] = await Promise.all([
-        this.client.get(`/api/v1/album/${albumId}`),
+        this.client.get(
+          `/api/v1/album/${albumId}`,
+          this.toAxiosConfig(options),
+        ),
         this.client.get("/api/v1/track", {
           params: { albumId },
+          ...this.toAxiosConfig(options),
         }),
       ]);
 
@@ -397,10 +465,14 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async searchAlbums(query: string): Promise<Album[]> {
+  async searchAlbums(
+    query: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Album[]> {
     try {
       const response = await this.client.get("/api/v1/album/lookup", {
         params: { term: query },
+        ...this.toAxiosConfig(options),
       });
 
       return response.data.map((album: any) => this.mapAlbum(album));
@@ -414,11 +486,19 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async setAlbumMonitored(albumId: number, monitored: boolean): Promise<void> {
+  async setAlbumMonitored(
+    albumId: number,
+    monitored: boolean,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.put(`/api/v1/album/${albumId}`, {
-        monitored,
-      });
+      await this.client.put(
+        `/api/v1/album/${albumId}`,
+        {
+          monitored,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -429,9 +509,12 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getTags(): Promise<any[]> {
+  async getTags(options?: { readonly signal?: AbortSignal }): Promise<any[]> {
     try {
-      const response = await this.client.get("/api/v1/tag");
+      const response = await this.client.get(
+        "/api/v1/tag",
+        this.toAxiosConfig(options),
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -443,9 +526,16 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async createTag(label: string): Promise<any> {
+  async createTag(
+    label: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<any> {
     try {
-      const response = await this.client.post("/api/v1/tag", { label });
+      const response = await this.client.post(
+        "/api/v1/tag",
+        { label },
+        this.toAxiosConfig(options),
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -457,12 +547,20 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async updateTag(tagId: number, label: string): Promise<any> {
+  async updateTag(
+    tagId: number,
+    label: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<any> {
     try {
-      const response = await this.client.put(`/api/v1/tag/${tagId}`, {
-        id: tagId,
-        label,
-      });
+      const response = await this.client.put(
+        `/api/v1/tag/${tagId}`,
+        {
+          id: tagId,
+          label,
+        },
+        this.toAxiosConfig(options),
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -474,9 +572,15 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async deleteTag(tagId: number): Promise<void> {
+  async deleteTag(
+    tagId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.delete(`/api/v1/tag/${tagId}`);
+      await this.client.delete(
+        `/api/v1/tag/${tagId}`,
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -487,9 +591,14 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getQualityProfiles(): Promise<MusicQualityProfile[]> {
+  async getQualityProfiles(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<MusicQualityProfile[]> {
     try {
-      const response = await this.client.get("/api/v1/qualityprofile");
+      const response = await this.client.get(
+        "/api/v1/qualityprofile",
+        this.toAxiosConfig(options),
+      );
       return response.data.map((profile: any) =>
         this.mapQualityProfile(profile),
       );
@@ -503,9 +612,14 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getMetadataProfiles(): Promise<MetadataProfile[]> {
+  async getMetadataProfiles(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<MetadataProfile[]> {
     try {
-      const response = await this.client.get("/api/v1/metadataProfile");
+      const response = await this.client.get(
+        "/api/v1/metadataProfile",
+        this.toAxiosConfig(options),
+      );
       return response.data.map((profile: any) =>
         this.mapMetadataProfile(profile),
       );
@@ -519,9 +633,14 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getRootFolders(): Promise<RootFolder[]> {
+  async getRootFolders(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<RootFolder[]> {
     try {
-      const response = await this.client.get("/api/v1/rootfolder");
+      const response = await this.client.get(
+        "/api/v1/rootfolder",
+        this.toAxiosConfig(options),
+      );
       return response.data.map((folder: any) => this.mapRootFolder(folder));
     } catch (error) {
       throw handleApiError(error, {
@@ -537,6 +656,7 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     start?: string,
     end?: string,
     unmonitored?: boolean,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<any[]> {
     try {
       const params: Record<string, unknown> = {
@@ -547,7 +667,10 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
       if (end) params.end = end;
       if (unmonitored !== undefined) params.unmonitored = unmonitored;
 
-      const response = await this.client.get("/api/v1/calendar", { params });
+      const response = await this.client.get("/api/v1/calendar", {
+        params,
+        ...this.toAxiosConfig(options),
+      });
       return response.data ?? [];
     } catch (error) {
       throw handleApiError(error, {
@@ -559,9 +682,14 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getQueue(): Promise<LidarrQueueItem[]> {
+  async getQueue(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<LidarrQueueItem[]> {
     try {
-      const response = await this.client.get("/api/v1/queue");
+      const response = await this.client.get(
+        "/api/v1/queue",
+        this.toAxiosConfig(options),
+      );
       return (response.data.records ?? []).map((record: any) =>
         this.mapQueueRecord(record),
       );
@@ -575,20 +703,26 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async getHistory(options?: {
-    page?: number;
-    pageSize?: number;
-  }): Promise<any> {
+  async getHistory(
+    historyOptions?: {
+      page?: number;
+      pageSize?: number;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<any> {
     try {
       const params: Record<string, unknown> = {};
-      if (options?.page) params.page = options.page;
-      if (options?.pageSize) params.pageSize = options.pageSize;
+      if (historyOptions?.page) params.page = historyOptions.page;
+      if (historyOptions?.pageSize) params.pageSize = historyOptions.pageSize;
       params.includeArtist = true;
       params.includeAlbum = true;
       params.sortKey = "date";
       params.sortDirection = "descending";
 
-      const response = await this.client.get("/api/v1/history", { params });
+      const response = await this.client.get("/api/v1/history", {
+        params,
+        ...this.toAxiosConfig(options),
+      });
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -600,9 +734,16 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async bulkUpdateArtists(editor: LidarrArtistEditor): Promise<void> {
+  async bulkUpdateArtists(
+    editor: LidarrArtistEditor,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.put("/api/v1/artist/editor", editor);
+      await this.client.put(
+        "/api/v1/artist/editor",
+        editor,
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -613,9 +754,16 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  async bulkUpdateAlbums(editor: LidarrAlbumEditor): Promise<void> {
+  async bulkUpdateAlbums(
+    editor: LidarrAlbumEditor,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.put("/api/v1/album/editor", editor);
+      await this.client.put(
+        "/api/v1/album/editor",
+        editor,
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -844,12 +992,10 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     };
   }
 
-  /**
-   * Retrieve logs from Lidarr using the /api/v1/log endpoint.
-   * Supports pagination, level filtering, and time range filtering.
-   * Uses appropriate API version for Lidarr (v1).
-   */
-  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+  override async getLogs(
+    options?: LogQueryOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<ServiceLog[]> {
     try {
       const params: Record<string, unknown> = {
         pageSize: options?.limit ?? 50,
@@ -860,14 +1006,10 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
         sortDirection: "descending",
       };
 
-      // Add level filter if specified
       if (options?.level && options.level.length > 0) {
-        // Lidarr uses uppercase level names (same as other *arr services)
         params.level = options.level.map((l) => l.toUpperCase()).join(",");
       }
 
-      // Note: Lidarr's /api/v1/log endpoint doesn't support time range filtering via query params
-      // We'll filter by time after fetching if needed
       const response = await this.client.get<{
         page?: number;
         pageSize?: number;
@@ -886,13 +1028,12 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
               method?: string | null;
             }[]
           | null;
-      }>("/api/v1/log", { params });
+      }>("/api/v1/log", { params, ...this.toAxiosConfig(requestOptions) });
 
       const logs = (response.data.records ?? []).map((log) =>
         this.normalizeLogEntry(log),
       );
 
-      // Apply time range filtering if specified
       let filteredLogs = logs;
       if (options?.since || options?.until) {
         filteredLogs = logs.filter((log) => {
@@ -906,7 +1047,6 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
         });
       }
 
-      // Apply search term filtering if specified
       if (options?.searchTerm) {
         const searchLower = options.searchTerm.toLowerCase();
         filteredLogs = filteredLogs.filter(
@@ -932,9 +1072,6 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     }
   }
 
-  /**
-   * Normalize a Lidarr log entry to the unified ServiceLog format.
-   */
   private normalizeLogEntry(log: {
     id?: number;
     time?: string;
@@ -963,9 +1100,6 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
     };
   }
 
-  /**
-   * Normalize Lidarr log level to the unified ServiceLogLevel format.
-   */
   private normalizeLidarrLogLevel(level?: string | null): ServiceLogLevel {
     if (!level) {
       return "info";

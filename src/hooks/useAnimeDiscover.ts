@@ -35,10 +35,13 @@ export const useAnimeRecommendations = ({
 
   return useQuery<JellyseerrPagedResult<JellyseerrSearchResult>, Error>({
     queryKey: queryKeys.jellyseerr.animeRecommendations(serviceId, page),
-    queryFn: async () => {
-      return (connector as JellyseerrConnector).getAnimeRecommendations({
-        page,
-      });
+    queryFn: async ({ signal }) => {
+      return (connector as JellyseerrConnector).getAnimeRecommendations(
+        {
+          page,
+        },
+        { signal },
+      );
     },
     enabled: hasConnector && enabled,
     staleTime: 5 * 60 * 1000,
@@ -56,8 +59,11 @@ export const useAnimeUpcoming = ({
 
   return useQuery<JellyseerrPagedResult<JellyseerrSearchResult>, Error>({
     queryKey: queryKeys.jellyseerr.animeUpcoming(serviceId, page),
-    queryFn: async () => {
-      return (connector as JellyseerrConnector).getAnimeUpcoming({ page });
+    queryFn: async ({ signal }) => {
+      return (connector as JellyseerrConnector).getAnimeUpcoming(
+        { page },
+        { signal },
+      );
     },
     enabled: hasConnector && enabled,
     staleTime: 5 * 60 * 1000,
@@ -75,8 +81,11 @@ export const useTrendingAnime = ({
 
   return useQuery<JellyseerrPagedResult<JellyseerrSearchResult>, Error>({
     queryKey: queryKeys.jellyseerr.trendingAnime(serviceId, page),
-    queryFn: async () => {
-      return (connector as JellyseerrConnector).getTrendingAnime({ page });
+    queryFn: async ({ signal }) => {
+      return (connector as JellyseerrConnector).getTrendingAnime(
+        { page },
+        { signal },
+      );
     },
     enabled: hasConnector && enabled,
     staleTime: 5 * 60 * 1000,
@@ -94,8 +103,11 @@ export const useAnimeMovies = ({
 
   return useQuery<JellyseerrPagedResult<JellyseerrSearchResult>, Error>({
     queryKey: queryKeys.jellyseerr.animeMovies(serviceId, page),
-    queryFn: async () => {
-      return (connector as JellyseerrConnector).getAnimeMovies({ page });
+    queryFn: async ({ signal }) => {
+      return (connector as JellyseerrConnector).getAnimeMovies(
+        { page },
+        { signal },
+      );
     },
     enabled: hasConnector && enabled,
     staleTime: 5 * 60 * 1000,

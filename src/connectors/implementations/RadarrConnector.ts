@@ -1,5 +1,9 @@
 import { BaseConnector } from "@/connectors/base/BaseConnector";
-import type { SearchOptions, SystemHealth } from "@/connectors/base/IConnector";
+import type {
+  SearchOptions,
+  SystemHealth,
+  ConnectorRequestOptions,
+} from "@/connectors/base/IConnector";
 import type {
   Quality,
   QualityProfile,
@@ -30,7 +34,6 @@ import type {
 
 export type { RadarrQueueItem };
 
-// Aliases for generated OpenAPI types
 type RadarrSystemStatus = components["schemas"]["SystemResource"];
 type RadarrMovieImage = components["schemas"]["MediaCover"];
 type RadarrRatings = components["schemas"]["Ratings"];
@@ -129,9 +132,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  /**
-   * Retrieve health status and messages from Radarr
-   */
   override async getHealth(): Promise<SystemHealth> {
     try {
       const response = await this.client.get<
@@ -140,9 +140,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
       const healthResources = response.data ?? [];
 
-      // Map Radarr health resources to our HealthMessage format
       const messages: HealthMessage[] = healthResources.map((resource) => {
-        // Map Radarr's HealthCheckResult to our severity levels
         const severityMap: Record<string, HealthMessageSeverity> = {
           ok: "info",
           notice: "info",
@@ -161,7 +159,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         };
       });
 
-      // Determine overall status based on health messages
       const hasErrors = messages.some((m) => m.severity === "error");
       const hasWarnings = messages.some((m) => m.severity === "warning");
 
@@ -199,11 +196,14 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getMovies(filters?: {
-    tags?: number[];
-    qualityProfileId?: number;
-    monitored?: boolean;
-  }): Promise<Movie[]> {
+  async getMovies(
+    filters?: {
+      tags?: number[];
+      qualityProfileId?: number;
+      monitored?: boolean;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Movie[]> {
     try {
       const params: Record<string, unknown> = {};
 
@@ -219,7 +219,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
       const response = await this.client.get<RadarrMovie[]>(
         `${RADARR_API_PREFIX}/movie`,
-        { params },
+        { params, ...this.toAxiosConfig(options) },
       );
       return (response.data ?? []).map((item) => this.mapMovie(item));
     } catch (error) {
@@ -232,18 +232,23 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async search(query: string, options?: SearchOptions): Promise<Movie[]> {
+  async search(
+    query: string,
+    searchOptions?: SearchOptions,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Movie[]> {
     try {
       const params: Record<string, unknown> = { term: query };
 
-      if (options?.filters) {
-        Object.assign(params, options.filters);
+      if (searchOptions?.filters) {
+        Object.assign(params, searchOptions.filters);
       }
 
       const response = await this.client.get<RadarrMovie[]>(
         `${RADARR_API_PREFIX}/movie/lookup`,
         {
           params,
+          ...this.toAxiosConfig(options),
         },
       );
 
@@ -258,22 +263,19 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  /**
-   * Lookup a movie by TMDB ID.
-   * Uses the dedicated Radarr endpoint /api/v3/movie/lookup/tmdb.
-   * Implementation-only method; not part of the public IConnector interface.
-   * @returns Movie if found, undefined if not found or error occurs.
-   */
-  async lookupByTmdbId(tmdbId: number): Promise<Movie | undefined> {
+  async lookupByTmdbId(
+    tmdbId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Movie | undefined> {
     try {
       const response = await this.client.get<RadarrMovie[]>(
         `${RADARR_API_PREFIX}/movie/lookup/tmdb`,
         {
           params: { tmdbId },
+          ...this.toAxiosConfig(options),
         },
       );
 
-      // Radarr /movie/lookup/tmdb returns an array with 0 or 1 item
       if (response.data && response.data.length > 0) {
         return this.mapMovie(response.data[0]);
       }
@@ -284,7 +286,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       });
       return undefined;
     } catch (error) {
-      // Log but don't throw; allow caller to handle missing movies gracefully
       logger.warn("[RadarrConnector] TMDB lookup failed", {
         serviceId: this.config.id,
         tmdbId,
@@ -294,10 +295,11 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getById(id: number): Promise<Movie> {
+  async getById(id: number, options?: ConnectorRequestOptions): Promise<Movie> {
     try {
       const response = await this.client.get<RadarrMovie>(
         `${RADARR_API_PREFIX}/movie/${id}`,
+        this.toAxiosConfig(options),
       );
       return this.mapMovie(response.data as RadarrMovie);
     } catch (error) {
@@ -310,12 +312,16 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async add(request: AddMovieRequest): Promise<Movie> {
+  async add(
+    request: AddMovieRequest,
+    options?: ConnectorRequestOptions,
+  ): Promise<Movie> {
     try {
       const payload = this.buildAddPayload(request);
       const response = await this.client.post<RadarrMovie>(
         `${RADARR_API_PREFIX}/movie`,
         payload,
+        this.toAxiosConfig(options),
       );
       return this.mapMovie(response.data as RadarrMovie);
     } catch (error) {
@@ -328,12 +334,19 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async triggerSearch(movieId: number): Promise<void> {
+  async triggerSearch(
+    movieId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post(`${RADARR_API_PREFIX}/command`, {
-        name: "MoviesSearch",
-        movieIds: [movieId],
-      });
+      await this.client.post(
+        `${RADARR_API_PREFIX}/command`,
+        {
+          name: "MoviesSearch",
+          movieIds: [movieId],
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -344,10 +357,15 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async setMonitored(movieId: number, monitored: boolean): Promise<void> {
+  async setMonitored(
+    movieId: number,
+    monitored: boolean,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
       const existing = await this.client.get<RadarrMovie>(
         `${RADARR_API_PREFIX}/movie/${movieId}`,
+        this.toAxiosConfig(options),
       );
       const payload = {
         ...(existing.data as RadarrMovie),
@@ -357,6 +375,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       await this.client.put(
         `${RADARR_API_PREFIX}/movie/${movieId}`,
         payload as unknown as RadarrMovie,
+        this.toAxiosConfig(options),
       );
     } catch (error) {
       throw handleApiError(error, {
@@ -370,16 +389,21 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
   async deleteMovie(
     movieId: number,
-    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
+    deleteOptions: {
+      deleteFiles?: boolean;
+      addImportListExclusion?: boolean;
+    } = {},
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     try {
       const params = {
-        deleteFiles: options.deleteFiles ?? false,
-        addImportListExclusion: options.addImportListExclusion ?? false,
+        deleteFiles: deleteOptions.deleteFiles ?? false,
+        addImportListExclusion: deleteOptions.addImportListExclusion ?? false,
       };
 
       await this.client.delete(`${RADARR_API_PREFIX}/movie/${movieId}`, {
         params,
+        ...this.toAxiosConfig(options),
       });
     } catch (error) {
       throw handleApiError(error, {
@@ -399,11 +423,13 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         "id" | "movieFile" | "ratings" | "statistics" | "images"
       >
     >,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<Movie> {
     try {
       const response = await this.client.put<RadarrMovie>(
         `${RADARR_API_PREFIX}/movie/${movieId}`,
         updates,
+        this.toAxiosConfig(options),
       );
       return this.mapMovie(response.data);
     } catch (error) {
@@ -416,12 +442,19 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async refreshMovie(movieId: number): Promise<void> {
+  async refreshMovie(
+    movieId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post(`${RADARR_API_PREFIX}/command`, {
-        name: "MoviesRefresh",
-        movieIds: [movieId],
-      });
+      await this.client.post(
+        `${RADARR_API_PREFIX}/command`,
+        {
+          name: "MoviesRefresh",
+          movieIds: [movieId],
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -432,12 +465,19 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async rescanMovie(movieId: number): Promise<void> {
+  async rescanMovie(
+    movieId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post(`${RADARR_API_PREFIX}/command`, {
-        name: "MoviesRescan",
-        movieIds: [movieId],
-      });
+      await this.client.post(
+        `${RADARR_API_PREFIX}/command`,
+        {
+          name: "MoviesRescan",
+          movieIds: [movieId],
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -448,12 +488,19 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async moveMovie(options: RadarrMoveMovieOptions): Promise<void> {
+  async moveMovie(
+    moveOptions: RadarrMoveMovieOptions,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post(`${RADARR_API_PREFIX}/command`, {
-        name: "MoviesMove",
-        ...options,
-      });
+      await this.client.post(
+        `${RADARR_API_PREFIX}/command`,
+        {
+          name: "MoviesMove",
+          ...moveOptions,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -464,13 +511,10 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  /**
-   * Get available releases/candidates for a movie (from indexers).
-   * Probes multiple candidate endpoints based on Radarr API versions.
-   */
   async getReleases(
     movieId: number,
-    options?: { indexerId?: number; minSeeders?: number },
+    searchOptions?: { indexerId?: number; minSeeders?: number },
+    options?: { readonly signal?: AbortSignal },
   ): Promise<NormalizedRelease[]> {
     const candidateEndpoints = [
       `${RADARR_API_PREFIX}/release`,
@@ -481,19 +525,23 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     for (const endpoint of candidateEndpoints) {
       try {
         const params: Record<string, unknown> = { movieId };
-        if (options?.indexerId) {
-          params.indexerId = options.indexerId;
+        if (searchOptions?.indexerId) {
+          params.indexerId = searchOptions.indexerId;
         }
 
         const response = await this.client.get<RadarrRelease[]>(endpoint, {
           params,
+          ...this.toAxiosConfig(options),
         });
 
         if (Array.isArray(response.data)) {
           return response.data
             .filter((r) => {
-              if (options?.minSeeders !== undefined && r.seeders !== null) {
-                return (r.seeders ?? 0) >= options.minSeeders;
+              if (
+                searchOptions?.minSeeders !== undefined &&
+                r.seeders !== null
+              ) {
+                return (r.seeders ?? 0) >= searchOptions.minSeeders;
               }
               return true;
             })
@@ -512,7 +560,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
             movieId,
           });
         }
-        // Try next candidate endpoint
       }
     }
 
@@ -525,10 +572,13 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     return [];
   }
 
-  async getTags(): Promise<RadarrTag[]> {
+  async getTags(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<RadarrTag[]> {
     try {
       const response = await this.client.get<RadarrTag[]>(
         `${RADARR_API_PREFIX}/tag`,
+        this.toAxiosConfig(options),
       );
       return response.data ?? [];
     } catch (error) {
@@ -541,11 +591,15 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async createTag(label: string): Promise<RadarrTag> {
+  async createTag(
+    label: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<RadarrTag> {
     try {
       const response = await this.client.post<RadarrTag>(
         `${RADARR_API_PREFIX}/tag`,
         { label },
+        this.toAxiosConfig(options),
       );
       return response.data as RadarrTag;
     } catch (error) {
@@ -558,11 +612,16 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async updateTag(tagId: number, label: string): Promise<RadarrTag> {
+  async updateTag(
+    tagId: number,
+    label: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<RadarrTag> {
     try {
       const response = await this.client.put<RadarrTag>(
         `${RADARR_API_PREFIX}/tag/${tagId}`,
         { id: tagId, label },
+        this.toAxiosConfig(options),
       );
       return response.data as RadarrTag;
     } catch (error) {
@@ -575,9 +634,15 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async deleteTag(tagId: number): Promise<void> {
+  async deleteTag(
+    tagId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.delete(`${RADARR_API_PREFIX}/tag/${tagId}`);
+      await this.client.delete(
+        `${RADARR_API_PREFIX}/tag/${tagId}`,
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -588,9 +653,16 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async bulkUpdateMovies(editor: RadarrMovieEditor): Promise<void> {
+  async bulkUpdateMovies(
+    editor: RadarrMovieEditor,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.put(`${RADARR_API_PREFIX}/movie/editor`, editor);
+      await this.client.put(
+        `${RADARR_API_PREFIX}/movie/editor`,
+        editor,
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -601,7 +673,9 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getQualityProfiles(): Promise<QualityProfile[]> {
+  async getQualityProfiles(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<QualityProfile[]> {
     const candidateEndpoints = [
       `${RADARR_API_PREFIX}/qualityprofile`,
       `${RADARR_API_PREFIX}/qualityProfile`,
@@ -610,10 +684,11 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
     for (const endpoint of candidateEndpoints) {
       try {
-        const response =
-          await this.client.get<RadarrQualityProfile[]>(endpoint);
+        const response = await this.client.get<RadarrQualityProfile[]>(
+          endpoint,
+          this.toAxiosConfig(options),
+        );
 
-        // Check if response contains an error
         if (
           response.data &&
           typeof response.data === "object" &&
@@ -643,7 +718,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
             endpoint,
           });
         }
-        // otherwise try next candidate
       }
     }
 
@@ -658,10 +732,13 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     });
   }
 
-  async getRootFolders(): Promise<RootFolder[]> {
+  async getRootFolders(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<RootFolder[]> {
     try {
       const response = await this.client.get<RadarrRootFolder[]>(
         `${RADARR_API_PREFIX}/rootfolder`,
+        this.toAxiosConfig(options),
       );
       return (response.data ?? []).map((folder) =>
         this.mapRootFolder(folder as RadarrRootFolder),
@@ -680,6 +757,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     start?: string,
     end?: string,
     unmonitored?: boolean,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<RadarrMovie[]> {
     try {
       const params: Record<string, unknown> = {};
@@ -689,7 +767,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
       const response = await this.client.get<RadarrMovie[]>(
         `${RADARR_API_PREFIX}/calendar`,
-        { params },
+        { params, ...this.toAxiosConfig(options) },
       );
       return (response.data ?? []) as RadarrMovie[];
     } catch (error) {
@@ -702,10 +780,13 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getQueue(): Promise<RadarrQueueItem[]> {
+  async getQueue(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<RadarrQueueItem[]> {
     try {
       const response = await this.client.get<RadarrQueueResponse>(
         `${RADARR_API_PREFIX}/queue`,
+        this.toAxiosConfig(options),
       );
       const records = (response.data?.records ?? []) as RadarrQueueRecord[];
       return records.map((record) => this.mapQueueRecord(record));
@@ -719,23 +800,27 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getHistory(options?: {
-    page?: number;
-    pageSize?: number;
-  }): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
+  async getHistory(
+    historyOptions?: {
+      page?: number;
+      pageSize?: number;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
     try {
       const params: Record<string, unknown> = {};
-      if (options?.page) params.page = options.page;
-      if (options?.pageSize) params.pageSize = options.pageSize;
-      // Include related data for better UI display
+      if (historyOptions?.page) params.page = historyOptions.page;
+      if (historyOptions?.pageSize) params.pageSize = historyOptions.pageSize;
       params.includeMovie = true;
-      // Order by most recent first
       params.sortKey = "date";
       params.sortDirection = "descending";
 
       const response = await this.client.get<
         components["schemas"]["HistoryResourcePagingResource"]
-      >(`${RADARR_API_PREFIX}/history`, { params });
+      >(`${RADARR_API_PREFIX}/history`, {
+        params,
+        ...this.toAxiosConfig(options),
+      });
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -855,7 +940,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       return undefined;
     }
 
-    // Ratings in Radarr are nested (imdb/tmdb/etc). Prefer imdb, then tmdb, then others.
     const imdb = ratings.imdb ?? undefined;
     const tmdb = ratings.tmdb ?? undefined;
     const mc = ratings.metacritic ?? undefined;
@@ -891,7 +975,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     return {
       movieFileCount: statistics.movieFileCount,
       sizeOnDisk: statistics.sizeOnDisk,
-      // Radarr's MovieStatisticsResource does not include percentAvailable; keep undefined.
       percentAvailable: undefined,
     };
   }
@@ -954,7 +1037,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     items: RadarrQualityProfileItem[],
     qualityId: number,
   ): Quality {
-    // Flatten all qualities from the nested structure
     const allQualities: RadarrQualityItem[] = [];
 
     const processItem = (item: RadarrQualityProfileItem) => {
@@ -973,7 +1055,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       return this.mapQualityResource(found);
     }
 
-    // Fallback: create a minimal quality object if not found
     return {
       id: qualityId,
       name: `Quality ${qualityId}`,
@@ -1043,8 +1124,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     try {
       const resolved = new URL(url, this.client.defaults.baseURL as string);
 
-      // If the connector has an apiKey and the resolved URL is within the same origin,
-      // append the apikey as a query parameter so image requests can be authenticated.
       if (this.config.apiKey) {
         const base = new URL(this.client.defaults.baseURL as string);
         if (resolved.origin === base.origin) {
@@ -1058,12 +1137,10 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  /**
-   * Retrieve logs from Radarr using the /api/v3/log endpoint.
-   * Supports pagination, level filtering, and time range filtering.
-   * Reuses Sonarr normalization logic with Radarr-specific adjustments.
-   */
-  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+  override async getLogs(
+    options?: LogQueryOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<ServiceLog[]> {
     try {
       const params: Record<string, unknown> = {
         pageSize: options?.limit ?? 50,
@@ -1074,23 +1151,21 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         sortDirection: "descending",
       };
 
-      // Add level filter if specified
       if (options?.level && options.level.length > 0) {
-        // Radarr uses uppercase level names (same as Sonarr)
         params.level = options.level.map((l) => l.toUpperCase()).join(",");
       }
 
-      // Note: Radarr's /api/v3/log endpoint doesn't support time range filtering via query params
-      // We'll filter by time after fetching if needed
       const response = await this.client.get<
         components["schemas"]["LogResourcePagingResource"]
-      >(`${RADARR_API_PREFIX}/log`, { params });
+      >(`${RADARR_API_PREFIX}/log`, {
+        params,
+        ...this.toAxiosConfig(requestOptions),
+      });
 
       const logs = (response.data.records ?? []).map((log) =>
         this.normalizeLogEntry(log),
       );
 
-      // Apply time range filtering if specified
       let filteredLogs = logs;
       if (options?.since || options?.until) {
         filteredLogs = logs.filter((log) => {
@@ -1104,7 +1179,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         });
       }
 
-      // Apply search term filtering if specified
       if (options?.searchTerm) {
         const searchLower = options.searchTerm.toLowerCase();
         filteredLogs = filteredLogs.filter(
@@ -1130,9 +1204,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  /**
-   * Normalize a Radarr log entry to the unified ServiceLog format.
-   */
   private normalizeLogEntry(
     log: components["schemas"]["LogResource"],
   ): ServiceLog {
@@ -1154,9 +1225,6 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     };
   }
 
-  /**
-   * Normalize Radarr log level to the unified ServiceLogLevel format.
-   */
   private normalizeRadarrLogLevel(level?: string | null): ServiceLogLevel {
     if (!level) {
       return "info";

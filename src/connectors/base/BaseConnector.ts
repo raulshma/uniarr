@@ -457,6 +457,18 @@ export abstract class BaseConnector<
     }).message;
   }
 
+  protected toAxiosConfig(
+    options?: { readonly signal?: AbortSignal },
+    extra?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!options?.signal && !extra) return {};
+    const config: Record<string, unknown> = { ...extra };
+    if (options?.signal) {
+      config.signal = options.signal;
+    }
+    return config;
+  }
+
   /**
    * Execute an operation with standardized retry logic for network errors
    */

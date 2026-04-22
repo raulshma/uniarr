@@ -29,7 +29,7 @@ export const useJellyfinItemDetails = ({
         : queryKeys.jellyfin.base,
     enabled,
     staleTime: 60_000,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (
         !serviceId ||
         !itemId ||
@@ -39,7 +39,7 @@ export const useJellyfinItemDetails = ({
         throw new Error("Jellyfin item identifier is required.");
       }
 
-      return (connector as JellyfinConnector).getItem(itemId);
+      return (connector as JellyfinConnector).getItem(itemId, { signal });
     },
   });
 };

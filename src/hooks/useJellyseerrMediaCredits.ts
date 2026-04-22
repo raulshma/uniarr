@@ -31,10 +31,12 @@ export const useJellyseerrMediaCredits = (
     ),
     enabled,
     staleTime: 10 * 60 * 1000,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!jellyseerrConnector || !mediaId)
         throw new Error("Connector not found");
-      return jellyseerrConnector.getMediaCredits(mediaId, mediaType);
+      return jellyseerrConnector.getMediaCredits(mediaId, mediaType, {
+        signal,
+      });
     },
   });
 };

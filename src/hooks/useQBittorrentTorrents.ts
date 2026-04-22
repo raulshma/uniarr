@@ -95,8 +95,10 @@ export const useQBittorrentTorrents = (
 
   const torrentsQuery = useQuery({
     queryKey: queryKeys.qbittorrent.torrents(serviceId, filters),
-    queryFn: async () => {
-      return (connector as QBittorrentConnector).getTorrents(filters);
+    queryFn: async ({ signal }) => {
+      return (connector as QBittorrentConnector).getTorrents(filters, {
+        signal,
+      });
     },
     enabled: isEnabled,
     refetchInterval: pollingInterval,
@@ -106,8 +108,8 @@ export const useQBittorrentTorrents = (
 
   const transferInfoQuery = useQuery({
     queryKey: queryKeys.qbittorrent.transferInfo(serviceId),
-    queryFn: async () => {
-      return (connector as QBittorrentConnector).getTransferInfo();
+    queryFn: async ({ signal }) => {
+      return (connector as QBittorrentConnector).getTransferInfo({ signal });
     },
     enabled: isEnabled,
     refetchInterval: pollingInterval,

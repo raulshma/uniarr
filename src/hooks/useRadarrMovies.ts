@@ -51,8 +51,8 @@ export const useRadarrMovies = ({
       serviceId,
       filters as Record<string, unknown> | undefined,
     ),
-    queryFn: async () => {
-      return (connector as RadarrConnector).getMovies(filters);
+    queryFn: async ({ signal }) => {
+      return (connector as RadarrConnector).getMovies(filters, { signal });
     },
     enabled: hasConnector,
     staleTime: 5 * 60 * 1000,

@@ -74,12 +74,16 @@ export class AdGuardHomeConnector extends BaseConnector {
     return status.version ?? "unknown";
   }
 
-  async getServerStatus(): Promise<AdGuardServerStatus> {
+  async getServerStatus(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<AdGuardServerStatus> {
     await this.ensureAuthenticated();
 
     try {
-      const response =
-        await this.client.get<AdGuardServerStatus>(STATUS_ENDPOINT);
+      const response = await this.client.get<AdGuardServerStatus>(
+        STATUS_ENDPOINT,
+        this.toAxiosConfig(options),
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -91,11 +95,16 @@ export class AdGuardHomeConnector extends BaseConnector {
     }
   }
 
-  async getStats(): Promise<AdGuardStats> {
+  async getStats(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<AdGuardStats> {
     await this.ensureAuthenticated();
 
     try {
-      const response = await this.client.get<AdGuardStats>(STATS_ENDPOINT);
+      const response = await this.client.get<AdGuardStats>(
+        STATS_ENDPOINT,
+        this.toAxiosConfig(options),
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -107,14 +116,22 @@ export class AdGuardHomeConnector extends BaseConnector {
     }
   }
 
-  async toggleProtection(enabled: boolean, duration?: number): Promise<void> {
+  async toggleProtection(
+    enabled: boolean,
+    duration?: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     await this.ensureAuthenticated();
 
     try {
-      await this.client.post(PROTECTION_ENDPOINT, {
-        enabled,
-        duration,
-      });
+      await this.client.post(
+        PROTECTION_ENDPOINT,
+        {
+          enabled,
+          duration,
+        },
+        { signal: options?.signal },
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -125,13 +142,20 @@ export class AdGuardHomeConnector extends BaseConnector {
     }
   }
 
-  async refreshFilters(options?: { whitelist?: boolean }): Promise<void> {
+  async refreshFilters(
+    filterOptions?: { whitelist?: boolean },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     await this.ensureAuthenticated();
 
     try {
-      await this.client.post(FILTER_REFRESH_ENDPOINT, {
-        whitelist: options?.whitelist ?? false,
-      });
+      await this.client.post(
+        FILTER_REFRESH_ENDPOINT,
+        {
+          whitelist: filterOptions?.whitelist ?? false,
+        },
+        { signal: options?.signal },
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -144,6 +168,7 @@ export class AdGuardHomeConnector extends BaseConnector {
 
   async getQueryLog(
     params?: AdGuardQueryLogParams,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<AdGuardQueryLogResult> {
     await this.ensureAuthenticated();
 
@@ -156,6 +181,7 @@ export class AdGuardHomeConnector extends BaseConnector {
           search: params?.search,
           response_status: params?.responseStatus,
         },
+        signal: options?.signal,
       });
 
       const data = response.data;
@@ -175,11 +201,15 @@ export class AdGuardHomeConnector extends BaseConnector {
     }
   }
 
-  async clearQueryLog(): Promise<void> {
+  async clearQueryLog(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<void> {
     await this.ensureAuthenticated();
 
     try {
-      await this.client.post(QUERY_LOG_CLEAR_ENDPOINT);
+      await this.client.post(QUERY_LOG_CLEAR_ENDPOINT, undefined, {
+        signal: options?.signal,
+      });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -190,12 +220,14 @@ export class AdGuardHomeConnector extends BaseConnector {
     }
   }
 
-  async getDashboardOverview(): Promise<AdGuardDashboardOverview> {
+  async getDashboardOverview(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<AdGuardDashboardOverview> {
     await this.ensureAuthenticated();
 
     const [status, stats] = await Promise.all([
-      this.getServerStatus(),
-      this.getStats(),
+      this.getServerStatus(options),
+      this.getStats(options),
     ]);
 
     const dashboardStats: AdGuardDashboardStats = {

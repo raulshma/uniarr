@@ -62,8 +62,8 @@ export const useRadarrMovieDetails = ({
 
   const detailsQuery = useQuery({
     queryKey: queryKeys.radarr.movieDetail(serviceId, movieId),
-    queryFn: async () => {
-      return radarrConnector.getById(movieId);
+    queryFn: async ({ signal }) => {
+      return radarrConnector.getById(movieId, { signal });
     },
     enabled: hasConnector && Number.isFinite(movieId),
     staleTime: 2 * 60 * 1000,

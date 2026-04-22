@@ -50,8 +50,8 @@ export const useSonarrSeries = ({
       serviceId,
       filters as Record<string, unknown> | undefined,
     ),
-    queryFn: async () => {
-      return (connector as SonarrConnector).getSeries(filters);
+    queryFn: async ({ signal }) => {
+      return (connector as SonarrConnector).getSeries(filters, { signal });
     },
     enabled: hasConnector,
     staleTime: 5 * 60 * 1000,

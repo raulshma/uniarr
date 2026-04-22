@@ -95,8 +95,10 @@ export const useTransmissionTorrents = (
 
   const torrentsQuery = useQuery({
     queryKey: queryKeys.transmission.torrents(serviceId, filters),
-    queryFn: async () => {
-      return (connector as TransmissionConnector).getTorrents(filters);
+    queryFn: async ({ signal }) => {
+      return (connector as TransmissionConnector).getTorrents(filters, {
+        signal,
+      });
     },
     enabled: isEnabled,
     refetchInterval: pollingInterval,
@@ -106,8 +108,8 @@ export const useTransmissionTorrents = (
 
   const transferInfoQuery = useQuery({
     queryKey: queryKeys.transmission.transferInfo(serviceId),
-    queryFn: async () => {
-      return (connector as TransmissionConnector).getTransferInfo();
+    queryFn: async ({ signal }) => {
+      return (connector as TransmissionConnector).getTransferInfo({ signal });
     },
     enabled: isEnabled,
     refetchInterval: pollingInterval,

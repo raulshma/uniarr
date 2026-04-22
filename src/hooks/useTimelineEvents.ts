@@ -968,7 +968,7 @@ export const useTimelineEvents = (filter?: TimelineFilter) => {
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: [queryKeys.activity.base, "timeline"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const manager = ConnectorManager.getInstance();
       await manager.loadSavedServices();
 

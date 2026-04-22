@@ -26,7 +26,7 @@ export const useJellyfinResume = ({
       ? queryKeys.jellyfin.resume(serviceId, { limit, includeTypes })
       : queryKeys.jellyfin.base,
     enabled: Boolean(serviceId),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!serviceId || !connector || connector.config.type !== "jellyfin") {
         return [];
       }
@@ -36,9 +36,12 @@ export const useJellyfinResume = ({
       const resumeItems = await jellyfinConnector.getResumeItems(
         limit,
         includeTypes,
+        { signal },
       );
 
-      const sessions = await jellyfinConnector.getNowPlayingSessions();
+      const sessions = await jellyfinConnector.getNowPlayingSessions({
+        signal,
+      });
 
       const playingItems: JellyfinResumeItem[] = sessions
         .filter((session) => {

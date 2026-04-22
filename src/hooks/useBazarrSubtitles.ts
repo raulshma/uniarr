@@ -57,8 +57,8 @@ export const useBazarrSubtitles = (
 
   const moviesQuery = useQuery({
     queryKey: queryKeys.bazarr.moviesList(serviceId),
-    queryFn: async () => {
-      return await bazarrConnector.getMovies();
+    queryFn: async ({ signal }) => {
+      return await bazarrConnector.getMovies({ signal });
     },
     enabled: hasConnector,
     staleTime: 5 * 60 * 1000,
@@ -66,8 +66,8 @@ export const useBazarrSubtitles = (
 
   const episodesQuery = useQuery({
     queryKey: queryKeys.bazarr.episodesList(serviceId),
-    queryFn: async () => {
-      return await bazarrConnector.getEpisodes();
+    queryFn: async ({ signal }) => {
+      return await bazarrConnector.getEpisodes({ signal });
     },
     enabled: hasConnector,
     staleTime: 5 * 60 * 1000,
@@ -75,8 +75,8 @@ export const useBazarrSubtitles = (
 
   const subtitlesQuery = useQuery({
     queryKey: queryKeys.bazarr.subtitlesList(serviceId),
-    queryFn: async () => {
-      return await bazarrConnector.getSubtitles();
+    queryFn: async ({ signal }) => {
+      return await bazarrConnector.getSubtitles({ signal });
     },
     enabled: hasConnector,
     staleTime: 2 * 60 * 1000,
@@ -84,8 +84,8 @@ export const useBazarrSubtitles = (
 
   const statisticsQuery = useQuery({
     queryKey: queryKeys.bazarr.statistics(serviceId),
-    queryFn: async () => {
-      return await bazarrConnector.getStatistics();
+    queryFn: async ({ signal }) => {
+      return await bazarrConnector.getStatistics({ signal });
     },
     enabled: hasConnector,
     staleTime: 10 * 60 * 1000,

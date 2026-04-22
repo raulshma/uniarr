@@ -17,7 +17,7 @@ export const useJellyfinSeriesEpisodes = ({
 }: UseJellyfinSeriesEpisodesOptions) => {
   return useQuery({
     queryKey: queryKeys.jellyfin.seriesEpisodes(serviceId!, seriesId!),
-    queryFn: async (): Promise<JellyfinItem[]> => {
+    queryFn: async ({ signal }): Promise<JellyfinItem[]> => {
       if (!serviceId || !seriesId) {
         return [];
       }
@@ -31,7 +31,7 @@ export const useJellyfinSeriesEpisodes = ({
         throw new Error("Jellyfin connector not found");
       }
 
-      return connector.getSeriesEpisodes(seriesId);
+      return connector.getSeriesEpisodes(seriesId, { signal });
     },
     enabled: enabled && Boolean(serviceId) && Boolean(seriesId),
     staleTime: 5 * 60 * 1000, // 5 minutes

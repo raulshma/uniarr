@@ -25,7 +25,7 @@ export function useNotInterestedItems(userId?: string): {
     queryKey: userId
       ? queryKeys.recommendations.notInterested(userId)
       : ["recommendations", "notInterested", "global"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userId) return [];
       return service.getRejectedRecommendations(userId);
     },

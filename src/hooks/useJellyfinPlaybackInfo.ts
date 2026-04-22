@@ -61,17 +61,21 @@ export const useJellyfinPlaybackInfo = (
     staleTime: disableRefetch ? Infinity : 30_000,
     refetchOnWindowFocus: !disableRefetch,
     refetchOnReconnect: !disableRefetch,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!serviceId || !itemId) {
         throw new Error("Jellyfin playback requires service and item id.");
       }
 
-      return (connector as JellyfinConnector).getPlaybackInfo(itemId, {
-        mediaSourceId,
-        audioStreamIndex,
-        subtitleStreamIndex,
-        maxStreamingBitrate,
-      });
+      return (connector as JellyfinConnector).getPlaybackInfo(
+        itemId,
+        {
+          mediaSourceId,
+          audioStreamIndex,
+          subtitleStreamIndex,
+          maxStreamingBitrate,
+        },
+        { signal },
+      );
     },
   });
 };

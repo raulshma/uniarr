@@ -197,11 +197,14 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTorrents(filters?: {
-    category?: string;
-    tag?: string;
-    status?: string;
-  }): Promise<Torrent[]> {
+  async getTorrents(
+    filters?: {
+      category?: string;
+      tag?: string;
+      status?: string;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Torrent[]> {
     await this.ensureAuthenticated();
 
     try {
@@ -213,6 +216,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
             tag: filters?.tag,
             filter: filters?.status,
           },
+          signal: options?.signal,
         },
       );
 
@@ -227,11 +231,18 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async pauseTorrent(hash: string): Promise<void> {
+  async pauseTorrent(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     await this.ensureAuthenticated();
 
     try {
-      await this.postForm(`${QB_API_PREFIX}/torrents/pause`, { hashes: hash });
+      await this.postForm(
+        `${QB_API_PREFIX}/torrents/pause`,
+        { hashes: hash },
+        options,
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -242,11 +253,18 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async resumeTorrent(hash: string): Promise<void> {
+  async resumeTorrent(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     await this.ensureAuthenticated();
 
     try {
-      await this.postForm(`${QB_API_PREFIX}/torrents/resume`, { hashes: hash });
+      await this.postForm(
+        `${QB_API_PREFIX}/torrents/resume`,
+        { hashes: hash },
+        options,
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -257,14 +275,22 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
+  async deleteTorrent(
+    hash: string,
+    deleteFiles = false,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     await this.ensureAuthenticated();
 
     try {
-      await this.postForm(`${QB_API_PREFIX}/torrents/delete`, {
-        hashes: hash,
-        deleteFiles: deleteFiles ? "true" : "false",
-      });
+      await this.postForm(
+        `${QB_API_PREFIX}/torrents/delete`,
+        {
+          hashes: hash,
+          deleteFiles: deleteFiles ? "true" : "false",
+        },
+        options,
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -275,13 +301,20 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async forceRecheck(hash: string): Promise<void> {
+  async forceRecheck(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     await this.ensureAuthenticated();
 
     try {
-      await this.postForm(`${QB_API_PREFIX}/torrents/recheck`, {
-        hashes: hash,
-      });
+      await this.postForm(
+        `${QB_API_PREFIX}/torrents/recheck`,
+        {
+          hashes: hash,
+        },
+        options,
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -292,12 +325,15 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTransferInfo(): Promise<TorrentTransferInfo> {
+  async getTransferInfo(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<TorrentTransferInfo> {
     await this.ensureAuthenticated();
 
     try {
       const response = await this.client.get<QBittorrentTransferInfo>(
         `${QB_API_PREFIX}/transfer/info`,
+        this.toAxiosConfig(options),
       );
       return this.mapTransferInfo(response.data);
     } catch (error) {
@@ -401,6 +437,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
   private async postForm(
     url: string,
     payload: Record<string, string>,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     const body = new URLSearchParams(payload);
 
@@ -408,6 +445,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
+      signal: options?.signal,
     });
   }
 
@@ -416,7 +454,10 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
    * Parses qBittorrent log format and normalizes to unified ServiceLog format.
    * Maps qBittorrent log levels to standard levels.
    */
-  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+  override async getLogs(
+    queryOptions?: LogQueryOptions,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<ServiceLog[]> {
     await this.ensureAuthenticated();
 
     try {
@@ -429,9 +470,9 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
       // qBittorrent supports filtering by log level
       // Levels: normal=1, info=2, warning=4, critical=8
       // We can combine them with bitwise OR
-      if (options?.level && options.level.length > 0) {
+      if (queryOptions?.level && queryOptions.level.length > 0) {
         let levelMask = 0;
-        options.level.forEach((level) => {
+        queryOptions.level.forEach((level) => {
           switch (level) {
             case "trace":
             case "debug":
@@ -462,19 +503,22 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
           timestamp: number;
           type: number;
         }[]
-      >(`${QB_API_PREFIX}/log/main`, { params });
+      >(`${QB_API_PREFIX}/log/main`, {
+        ...{ params },
+        signal: options?.signal,
+      });
 
       let logs = (response.data ?? []).map((log) =>
         this.normalizeQBittorrentLogEntry(log),
       );
 
       // Apply time range filtering if specified
-      if (options?.since || options?.until) {
+      if (queryOptions?.since || queryOptions?.until) {
         logs = logs.filter((log) => {
-          if (options.since && log.timestamp < options.since) {
+          if (queryOptions.since && log.timestamp < queryOptions.since) {
             return false;
           }
-          if (options.until && log.timestamp > options.until) {
+          if (queryOptions.until && log.timestamp > queryOptions.until) {
             return false;
           }
           return true;
@@ -482,16 +526,16 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
       }
 
       // Apply search term filtering if specified
-      if (options?.searchTerm) {
-        const searchLower = options.searchTerm.toLowerCase();
+      if (queryOptions?.searchTerm) {
+        const searchLower = queryOptions.searchTerm.toLowerCase();
         logs = logs.filter((log) =>
           log.message.toLowerCase().includes(searchLower),
         );
       }
 
       // Apply pagination
-      const limit = options?.limit ?? 50;
-      const startIndex = options?.startIndex ?? 0;
+      const limit = queryOptions?.limit ?? 50;
+      const startIndex = queryOptions?.startIndex ?? 0;
       const paginatedLogs = logs.slice(startIndex, startIndex + limit);
 
       return paginatedLogs;

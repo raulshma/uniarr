@@ -36,6 +36,7 @@ const checkItemInLibrary = async (
   params: CheckInLibraryParams,
   radarrConnectors: RadarrConnector[],
   sonarrConnectors: SonarrConnector[],
+  signal?: AbortSignal,
 ): Promise<FoundService[]> => {
   const { tmdbId, tvdbId, sourceId, mediaType, enabled = true } = params;
 
@@ -53,7 +54,7 @@ const checkItemInLibrary = async (
     if (mediaType === "movie") {
       for (const connector of radarrConnectors) {
         try {
-          const movies = await connector.getMovies();
+          const movies = await connector.getMovies(undefined, { signal });
           for (const movie of movies) {
             if (tmdbId && movie.tmdbId === tmdbId) {
               foundServices.push({
@@ -75,7 +76,7 @@ const checkItemInLibrary = async (
     } else if (mediaType === "series") {
       for (const connector of sonarrConnectors) {
         try {
-          const series = await connector.getSeries();
+          const series = await connector.getSeries(undefined, { signal });
           for (const item of series) {
             if (
               (tmdbId && item.tmdbId === tmdbId) ||
@@ -127,8 +128,8 @@ export const useCheckInLibrary = (
       imdbId: params.sourceId,
       mediaType: params.mediaType,
     }),
-    queryFn: async () =>
-      checkItemInLibrary(params, radarrConnectors, sonarrConnectors),
+    queryFn: async ({ signal }) =>
+      checkItemInLibrary(params, radarrConnectors, sonarrConnectors, signal),
     enabled: params.enabled !== false,
     ...QUERY_CONFIG.LIBRARY_CHECK,
   });

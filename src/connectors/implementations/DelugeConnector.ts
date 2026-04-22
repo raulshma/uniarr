@@ -145,11 +145,14 @@ export class DelugeConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTorrents(filters?: {
-    category?: string;
-    tag?: string;
-    status?: string;
-  }): Promise<Torrent[]> {
+  async getTorrents(
+    filters?: {
+      category?: string;
+      tag?: string;
+      status?: string;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Torrent[]> {
     try {
       const response = await this.rpcRequest<DelugeTorrentsResponse>(
         "core.get_torrents_status",
@@ -178,6 +181,7 @@ export class DelugeConnector extends BaseConnector<Torrent> {
             "distributed_copies",
           ],
         ],
+        options,
       );
 
       const torrents = response.result;
@@ -198,9 +202,12 @@ export class DelugeConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async pauseTorrent(hash: string): Promise<void> {
+  async pauseTorrent(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.rpcRequest("core.pause_torrent", [[hash]]);
+      await this.rpcRequest("core.pause_torrent", [[hash]], options);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -211,9 +218,12 @@ export class DelugeConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async resumeTorrent(hash: string): Promise<void> {
+  async resumeTorrent(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.rpcRequest("core.resume_torrent", [[hash]]);
+      await this.rpcRequest("core.resume_torrent", [[hash]], options);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -224,9 +234,17 @@ export class DelugeConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
+  async deleteTorrent(
+    hash: string,
+    deleteFiles = false,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.rpcRequest("core.remove_torrent", [hash, deleteFiles]);
+      await this.rpcRequest(
+        "core.remove_torrent",
+        [hash, deleteFiles],
+        options,
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -237,9 +255,12 @@ export class DelugeConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async forceRecheck(hash: string): Promise<void> {
+  async forceRecheck(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.rpcRequest("core.force_recheck", [[hash]]);
+      await this.rpcRequest("core.force_recheck", [[hash]], options);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -250,11 +271,14 @@ export class DelugeConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTransferInfo(): Promise<TorrentTransferInfo> {
+  async getTransferInfo(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<TorrentTransferInfo> {
     try {
       const response = await this.rpcRequest<DelugeStatsResponse>(
         "core.get_session_status",
         [["download_rate", "upload_rate"]],
+        options,
       );
 
       return {
@@ -273,7 +297,11 @@ export class DelugeConnector extends BaseConnector<Torrent> {
     }
   }
 
-  private async rpcRequest<T>(method: string, params?: any[]): Promise<T> {
+  private async rpcRequest<T>(
+    method: string,
+    params?: any[],
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<T> {
     const payload = {
       method,
       params: params || [],
@@ -285,6 +313,7 @@ export class DelugeConnector extends BaseConnector<Torrent> {
       headers: {
         "Content-Type": "application/json",
       },
+      signal: options?.signal,
     });
 
     return response.data;

@@ -179,11 +179,14 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTorrents(filters?: {
-    category?: string;
-    tag?: string;
-    status?: string;
-  }): Promise<Torrent[]> {
+  async getTorrents(
+    filters?: {
+      category?: string;
+      tag?: string;
+      status?: string;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Torrent[]> {
     try {
       const response = await this.rpcRequest<TransmissionTorrentResponse>(
         "torrent-get",
@@ -207,6 +210,7 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
             "trackerStats",
           ],
         },
+        options,
       );
 
       return response.arguments.torrents.map((torrent) =>
@@ -222,9 +226,12 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async pauseTorrent(hash: string): Promise<void> {
+  async pauseTorrent(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.rpcRequest("torrent-stop", { ids: [hash] });
+      await this.rpcRequest("torrent-stop", { ids: [hash] }, options);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -235,9 +242,12 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async resumeTorrent(hash: string): Promise<void> {
+  async resumeTorrent(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.rpcRequest("torrent-start", { ids: [hash] });
+      await this.rpcRequest("torrent-start", { ids: [hash] }, options);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -248,12 +258,20 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
+  async deleteTorrent(
+    hash: string,
+    deleteFiles = false,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.rpcRequest("torrent-remove", {
-        ids: [hash],
-        "delete-local-data": deleteFiles,
-      });
+      await this.rpcRequest(
+        "torrent-remove",
+        {
+          ids: [hash],
+          "delete-local-data": deleteFiles,
+        },
+        options,
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -264,9 +282,12 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async forceRecheck(hash: string): Promise<void> {
+  async forceRecheck(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.rpcRequest("torrent-verify", { ids: [hash] });
+      await this.rpcRequest("torrent-verify", { ids: [hash] }, options);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -277,12 +298,15 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTransferInfo(): Promise<TorrentTransferInfo> {
+  async getTransferInfo(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<TorrentTransferInfo> {
     try {
-      const response =
-        await this.rpcRequest<TransmissionSessionStatsResponse>(
-          "session-stats",
-        );
+      const response = await this.rpcRequest<TransmissionSessionStatsResponse>(
+        "session-stats",
+        undefined,
+        options,
+      );
 
       return {
         downloadSpeed: response.arguments.downloadSpeed,
@@ -324,13 +348,19 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     }
   }
 
-  private async rpcRequest<T = any>(method: string, args?: any): Promise<T> {
+  private async rpcRequest<T = any>(
+    method: string,
+    args?: any,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<T> {
     const payload = {
       method,
       arguments: args || {},
     };
 
-    const response = await this.client.post("/transmission/rpc", payload);
+    const response = await this.client.post("/transmission/rpc", payload, {
+      signal: options?.signal,
+    });
     return response.data;
   }
 

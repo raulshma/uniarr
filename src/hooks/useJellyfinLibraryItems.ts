@@ -52,7 +52,7 @@ export const useJellyfinLibraryItems = ({
     staleTime: 30_000,
     placeholderData: (previousData) => previousData ?? [],
     refetchOnWindowFocus: false,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (
         !serviceId ||
         !libraryId ||
@@ -62,14 +62,18 @@ export const useJellyfinLibraryItems = ({
         return [];
       }
 
-      return (connector as JellyfinConnector).getLibraryItems(libraryId, {
-        searchTerm: normalizedSearch,
-        includeItemTypes,
-        mediaTypes,
-        sortBy,
-        sortOrder,
-        limit,
-      });
+      return (connector as JellyfinConnector).getLibraryItems(
+        libraryId,
+        {
+          searchTerm: normalizedSearch,
+          includeItemTypes,
+          mediaTypes,
+          sortBy,
+          sortOrder,
+          limit,
+        },
+        { signal },
+      );
     },
   });
 };

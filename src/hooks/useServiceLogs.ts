@@ -94,7 +94,7 @@ export function useServiceLogs(
 
   return useQuery({
     queryKey,
-    queryFn: async (): Promise<AggregatedLogs> => {
+    queryFn: async ({ signal }): Promise<AggregatedLogs> => {
       const fetchOptions: LogQueryOptions = {
         ...queryOptions,
         limit: queryOptions.limit || 1000, // Default limit
@@ -222,7 +222,7 @@ export function useServiceLogsPaginated(
 
   return useInfiniteQuery({
     queryKey,
-    queryFn: async ({ pageParam = 0 }): Promise<AggregatedLogs> => {
+    queryFn: async ({ pageParam = 0, signal }): Promise<AggregatedLogs> => {
       const fetchOptions: LogQueryOptions = {
         ...queryOptions,
         limit: pageSize,
@@ -362,7 +362,7 @@ export function useLogSearch(
 
   return useQuery({
     queryKey,
-    queryFn: async (): Promise<ServiceLog[]> => {
+    queryFn: async ({ signal }): Promise<ServiceLog[]> => {
       // Try to search from service
       if (isConnected) {
         try {
@@ -424,7 +424,7 @@ export function useLogCacheTimestamp(serviceIds: string[] = []): Date | null {
 
   const { data } = useQuery({
     queryKey: queryKeys.logs.cacheTimestamp(cacheKey),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       return await cacheService.getLogsCacheTimestamp(cacheKey);
     },
     staleTime: STALE_TIME.SHORT,

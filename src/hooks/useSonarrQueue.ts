@@ -113,7 +113,7 @@ export const useSonarrQueue = (
 
   const { data, error, isLoading, isFetching, refetch } = useQuery({
     queryKey: queryKeys.sonarr.queue(serviceId, queryOptions),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       try {
         // Return empty result if serviceId is not provided
         if (!serviceId || serviceId.trim() === "") {
@@ -136,8 +136,9 @@ export const useSonarrQueue = (
           queryOptions,
         });
 
-        // Get queue data from connector
-        const response = await (connector as any).client.get("/api/v3/queue");
+        const response = await (connector as any).client.get("/api/v3/queue", {
+          signal,
+        });
         let rawQueueItems = response.data?.records ?? [];
 
         // Optimized: Collect episode IDs that are missing episode details in single pass
@@ -158,8 +159,10 @@ export const useSonarrQueue = (
           });
 
           try {
-            const episodes =
-              await connector.getEpisodesByIds(missingEpisodeIds);
+            const episodes = await connector.getEpisodesByIds(
+              missingEpisodeIds,
+              { signal },
+            );
 
             // Create a map of episode ID to episode details
             const episodeMap = new Map<

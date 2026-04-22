@@ -112,8 +112,8 @@ export const useSonarrSeriesDetails = ({
 
   const detailsQuery = useQuery({
     queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
-    queryFn: async () => {
-      return sonarrConnector.getById(seriesId);
+    queryFn: async ({ signal }) => {
+      return sonarrConnector.getById(seriesId, { signal });
     },
     enabled: hasConnector && Number.isFinite(seriesId),
     staleTime: 2 * 60 * 1000,

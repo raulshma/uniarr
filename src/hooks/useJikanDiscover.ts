@@ -62,7 +62,7 @@ export const useJikanTopAnime = ({
 }) =>
   useQuery({
     queryKey: queryKeys.discover.jikan.top(page),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const data = await JikanClient.getTopAnime(page);
       const toRecord = (v: unknown): Record<string, unknown> | null =>
         v && typeof v === "object" ? (v as Record<string, unknown>) : null;
@@ -90,7 +90,7 @@ export const useJikanRecommendations = ({
     queryKey: queryKeys.discover.jikan.recommendationsList(page),
     enabled,
     ...QUERY_CONFIG.ANIME,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const data = await JikanClient.getRecommendations(page);
       const toRecord = (v: unknown): Record<string, unknown> | null =>
         v && typeof v === "object" ? (v as Record<string, unknown>) : null;
@@ -186,7 +186,7 @@ export const useJikanSeasonNow = ({ enabled = true }: { enabled?: boolean }) =>
     queryKey: queryKeys.discover.jikan.seasons.now,
     enabled,
     ...QUERY_CONFIG.ANIME,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const data = await JikanClient.getSeasonNow();
       const toRecord = (v: unknown): Record<string, unknown> | null =>
         v && typeof v === "object" ? (v as Record<string, unknown>) : null;
@@ -210,7 +210,7 @@ export const useJikanSeasonUpcoming = ({
     queryKey: queryKeys.discover.jikan.seasons.upcoming,
     enabled,
     ...QUERY_CONFIG.ANIME,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const data = await JikanClient.getSeasonUpcoming();
       const toRecord = (v: unknown): Record<string, unknown> | null =>
         v && typeof v === "object" ? (v as Record<string, unknown>) : null;

@@ -35,12 +35,12 @@ export const useJellyfinNowPlaying = ({
     refetchInterval: pollingInterval,
     refetchIntervalInBackground: false,
     placeholderData: (previous) => previous ?? [],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!serviceId || !connector || connector.config.type !== "jellyfin") {
         return [];
       }
 
-      return (connector as JellyfinConnector).getNowPlayingSessions();
+      return (connector as JellyfinConnector).getNowPlayingSessions({ signal });
     },
   });
 };

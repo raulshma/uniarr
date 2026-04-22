@@ -43,8 +43,8 @@ export const useAdGuardHomeDashboard = (
 
   const overviewQuery = useQuery({
     queryKey: queryKeys.adguard.overview(serviceId),
-    queryFn: async () => {
-      return adguardConnector.getDashboardOverview();
+    queryFn: async ({ signal }) => {
+      return adguardConnector.getDashboardOverview({ signal });
     },
     enabled: hasConnector,
     staleTime: 30_000,

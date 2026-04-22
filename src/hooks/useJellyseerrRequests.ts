@@ -132,9 +132,10 @@ export const useJellyseerrRequests = (
 
   const requestsQuery = useQuery<JellyseerrRequestList, Error>({
     queryKey: queryKeys.jellyseerr.requestsList(serviceId, queryKeyParams),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       return (jellyseerrConnector as JellyseerrConnector).getRequests(
         normalizedOptions,
+        { signal },
       );
     },
     enabled: hasConnector,

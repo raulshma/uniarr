@@ -23,16 +23,12 @@ import type {
   ServiceLogLevel,
 } from "@/models/logger.types";
 
-/**
- * Bazarr connector for subtitle management
- */
 export class BazarrConnector extends BaseConnector<
   BazarrMovie | BazarrEpisode,
   BazarrSearchRequest,
   Partial<BazarrMovie | BazarrEpisode>
 > {
   async initialize(): Promise<void> {
-    // Bazarr initialization - mainly authentication check
     await this.ensureAuthenticated();
   }
 
@@ -51,14 +47,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Movie Management Methods
-
-  /**
-   * Get all movies with subtitle information
-   */
-  async getMovies(): Promise<BazarrMovie[]> {
+  async getMovies(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrMovie[]> {
     try {
-      const response = await this.client.get("/api/movies");
+      const response = await this.client.get(
+        "/api/movies",
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -69,12 +65,15 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Get a specific movie by ID
-   */
-  async getMovieById(id: number): Promise<BazarrMovie> {
+  async getMovieById(
+    id: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<BazarrMovie> {
     try {
-      const response = await this.client.get(`/api/movies/${id}`);
+      const response = await this.client.get(
+        `/api/movies/${id}`,
+        this.toAxiosConfig(options),
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -85,14 +84,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Episode Management Methods
-
-  /**
-   * Get all episodes with subtitle information
-   */
-  async getEpisodes(): Promise<BazarrEpisode[]> {
+  async getEpisodes(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrEpisode[]> {
     try {
-      const response = await this.client.get("/api/episodes");
+      const response = await this.client.get(
+        "/api/episodes",
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -103,13 +102,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Get episodes for a specific series
-   */
-  async getEpisodesBySeriesId(seriesId: number): Promise<BazarrEpisode[]> {
+  async getEpisodesBySeriesId(
+    seriesId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<BazarrEpisode[]> {
     try {
       const response = await this.client.get(
         `/api/episodes/series/${seriesId}`,
+        this.toAxiosConfig(options),
       );
       return response.data || [];
     } catch (error) {
@@ -121,12 +121,15 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Get a specific episode by ID
-   */
-  async getEpisodeById(id: number): Promise<BazarrEpisode> {
+  async getEpisodeById(
+    id: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<BazarrEpisode> {
     try {
-      const response = await this.client.get(`/api/episodes/${id}`);
+      const response = await this.client.get(
+        `/api/episodes/${id}`,
+        this.toAxiosConfig(options),
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -137,14 +140,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Subtitle Management Methods
-
-  /**
-   * Get all subtitles
-   */
-  async getSubtitles(): Promise<BazarrSubtitle[]> {
+  async getSubtitles(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrSubtitle[]> {
     try {
-      const response = await this.client.get("/api/subtitles");
+      const response = await this.client.get(
+        "/api/subtitles",
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -155,12 +158,15 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Get subtitles for a specific movie
-   */
-  async getSubtitlesByMovieId(movieId: number): Promise<BazarrSubtitle[]> {
+  async getSubtitlesByMovieId(
+    movieId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<BazarrSubtitle[]> {
     try {
-      const response = await this.client.get(`/api/subtitles/movie/${movieId}`);
+      const response = await this.client.get(
+        `/api/subtitles/movie/${movieId}`,
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -171,13 +177,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Get subtitles for a specific episode
-   */
-  async getSubtitlesByEpisodeId(episodeId: number): Promise<BazarrSubtitle[]> {
+  async getSubtitlesByEpisodeId(
+    episodeId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<BazarrSubtitle[]> {
     try {
       const response = await this.client.get(
         `/api/subtitles/episode/${episodeId}`,
+        this.toAxiosConfig(options),
       );
       return response.data || [];
     } catch (error) {
@@ -189,16 +196,15 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Search for subtitles for a movie/episode
-   */
   async searchSubtitles(
     searchRequest: BazarrSearchRequest,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<BazarrSearchResult[]> {
     try {
       const response = await this.client.post(
         "/api/subtitles/search",
         searchRequest,
+        this.toAxiosConfig(options),
       );
       return response.data || [];
     } catch (error) {
@@ -210,14 +216,16 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Download a subtitle
-   */
   async downloadSubtitle(
     downloadRequest: BazarrDownloadRequest,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<boolean> {
     try {
-      await this.client.post("/api/subtitles/download", downloadRequest);
+      await this.client.post(
+        "/api/subtitles/download",
+        downloadRequest,
+        this.toAxiosConfig(options),
+      );
       return true;
     } catch (error) {
       throw handleApiError(error, {
@@ -228,14 +236,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Language Management Methods
-
-  /**
-   * Get all available languages
-   */
-  async getLanguages(): Promise<BazarrLanguage[]> {
+  async getLanguages(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrLanguage[]> {
     try {
-      const response = await this.client.get("/api/languages");
+      const response = await this.client.get(
+        "/api/languages",
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -246,12 +254,11 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Get enabled languages
-   */
-  async getEnabledLanguages(): Promise<BazarrLanguage[]> {
+  async getEnabledLanguages(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrLanguage[]> {
     try {
-      const languages = await this.getLanguages();
+      const languages = await this.getLanguages(options);
       return languages.filter((lang) => lang.enabled);
     } catch (error) {
       throw handleApiError(error, {
@@ -262,14 +269,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Provider Management Methods
-
-  /**
-   * Get all subtitle providers
-   */
-  async getProviders(): Promise<BazarrProvider[]> {
+  async getProviders(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrProvider[]> {
     try {
-      const response = await this.client.get("/api/providers");
+      const response = await this.client.get(
+        "/api/providers",
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -280,12 +287,11 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Get enabled providers
-   */
-  async getEnabledProviders(): Promise<BazarrProvider[]> {
+  async getEnabledProviders(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrProvider[]> {
     try {
-      const providers = await this.getProviders();
+      const providers = await this.getProviders(options);
       return providers.filter((provider) => provider.enabled);
     } catch (error) {
       throw handleApiError(error, {
@@ -296,14 +302,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Profile Management Methods
-
-  /**
-   * Get all subtitle profiles
-   */
-  async getProfiles(): Promise<BazarrProfile[]> {
+  async getProfiles(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrProfile[]> {
     try {
-      const response = await this.client.get("/api/profiles");
+      const response = await this.client.get(
+        "/api/profiles",
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -314,14 +320,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Queue and History Methods
-
-  /**
-   * Get download queue
-   */
-  async getQueue(): Promise<BazarrQueueItem[]> {
+  async getQueue(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrQueueItem[]> {
     try {
-      const response = await this.client.get("/api/queue");
+      const response = await this.client.get(
+        "/api/queue",
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -332,12 +338,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Get download history
-   */
-  async getHistory(): Promise<BazarrHistoryItem[]> {
+  async getHistory(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrHistoryItem[]> {
     try {
-      const response = await this.client.get("/api/history");
+      const response = await this.client.get(
+        "/api/history",
+        this.toAxiosConfig(options),
+      );
       return response.data || [];
     } catch (error) {
       throw handleApiError(error, {
@@ -348,17 +356,14 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Statistics Methods
-
-  /**
-   * Get overall statistics
-   */
-  async getStatistics(): Promise<BazarrStatistics> {
+  async getStatistics(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrStatistics> {
     try {
       const [movies, episodes, subtitles] = await Promise.all([
-        this.getMovies(),
-        this.getEpisodes(),
-        this.getSubtitles(),
+        this.getMovies(options),
+        this.getEpisodes(options),
+        this.getSubtitles(options),
       ]);
 
       const missingSubtitles = [...movies, ...episodes].flatMap(
@@ -380,16 +385,13 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  // Utility Methods
-
-  /**
-   * Get missing subtitles for all movies and episodes
-   */
-  async getAllMissingSubtitles(): Promise<BazarrMissingSubtitle[]> {
+  async getAllMissingSubtitles(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<BazarrMissingSubtitle[]> {
     try {
       const [movies, episodes] = await Promise.all([
-        this.getMovies(),
-        this.getEpisodes(),
+        this.getMovies(options),
+        this.getEpisodes(options),
       ]);
 
       return [
@@ -405,44 +407,36 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Search functionality for unified search integration
-   */
   async search(
     query: string,
     options?: SearchOptions,
   ): Promise<(BazarrMovie | BazarrEpisode)[]> {
-    // Bazarr doesn't have traditional search like Sonarr/Radarr
-    // Return empty array for now - could be extended to search movies/episodes by title
     return [];
   }
 
-  /**
-   * Retrieve logs from Bazarr using the /system/logs endpoint.
-   * Note: Bazarr's log API is simpler and returns logs as an array of strings.
-   * We'll parse and normalize them to the unified ServiceLog format.
-   */
-  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+  override async getLogs(
+    options?: LogQueryOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<ServiceLog[]> {
     try {
-      const response = await this.client.get<string[]>("/system/logs");
+      const response = await this.client.get<string[]>(
+        "/system/logs",
+        this.toAxiosConfig(requestOptions),
+      );
       const logLines = response.data || [];
 
-      // Bazarr returns logs as an array of strings, we need to parse them
       const logs = logLines
         .map((line, index) => this.parseBazarrLogLine(line, index))
         .filter((log): log is ServiceLog => log !== null);
 
-      // Apply filters
       let filteredLogs = logs;
 
-      // Apply level filter if specified
       if (options?.level && options.level.length > 0) {
         filteredLogs = filteredLogs.filter((log) =>
           options.level!.includes(log.level),
         );
       }
 
-      // Apply time range filtering if specified
       if (options?.since || options?.until) {
         filteredLogs = filteredLogs.filter((log) => {
           if (options.since && log.timestamp < options.since) {
@@ -455,7 +449,6 @@ export class BazarrConnector extends BaseConnector<
         });
       }
 
-      // Apply search term filtering if specified
       if (options?.searchTerm) {
         const searchLower = options.searchTerm.toLowerCase();
         filteredLogs = filteredLogs.filter((log) =>
@@ -463,7 +456,6 @@ export class BazarrConnector extends BaseConnector<
         );
       }
 
-      // Apply limit
       if (options?.limit) {
         const startIndex = options.startIndex ?? 0;
         filteredLogs = filteredLogs.slice(
@@ -487,17 +479,11 @@ export class BazarrConnector extends BaseConnector<
     }
   }
 
-  /**
-   * Parse a Bazarr log line into a ServiceLog entry.
-   * Bazarr log format is typically: "YYYY-MM-DD HH:MM:SS LEVEL :: message"
-   */
   private parseBazarrLogLine(line: string, index: number): ServiceLog | null {
     if (!line || line.trim().length === 0) {
       return null;
     }
 
-    // Try to parse the log line
-    // Format: "2024-01-15 10:30:45 INFO :: message here"
     const logPattern =
       /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(\w+)\s+::\s+(.+)$/;
     const match = line.match(logPattern);
@@ -518,7 +504,6 @@ export class BazarrConnector extends BaseConnector<
       };
     }
 
-    // If parsing fails, return a basic log entry
     return {
       id: `bazarr-${this.config.id}-${index}`,
       serviceId: this.config.id,
@@ -531,9 +516,6 @@ export class BazarrConnector extends BaseConnector<
     };
   }
 
-  /**
-   * Normalize Bazarr log level to the unified ServiceLogLevel format.
-   */
   private normalizeBazarrLogLevel(level: string): ServiceLogLevel {
     const levelLower = level.toLowerCase();
     switch (levelLower) {
