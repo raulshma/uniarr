@@ -97,7 +97,7 @@ export function useRecommendations(
     refetch: queryRefetch,
   } = useQuery({
     queryKey: queryKeys.recommendations.list(userId),
-    queryFn: async (): Promise<RecommendationResponseData> => {
+    queryFn: async ({ signal }): Promise<RecommendationResponseData> => {
       void logger.info("Fetching recommendations via hook", {
         userId,
         limit,

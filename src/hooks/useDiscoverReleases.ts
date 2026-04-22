@@ -3,7 +3,7 @@ import { queryKeys } from "@/hooks/queryKeys";
 import { QUERY_CONFIG } from "@/hooks/queryConfig";
 import {
   useConnectorsStore,
-  selectGetConnectorsByType,
+  selectConnectorsByType,
 } from "@/store/connectorsStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
@@ -15,26 +15,15 @@ import { logger } from "@/services/logger/LoggerService";
 import { alert } from "@/services/dialogService";
 
 export interface UseDiscoverReleasesOptions {
-  /** Enable the query (default: true) */
   enabled?: boolean;
-  /** Prefer quality over seeders when ranking (default: true) */
   preferQuality?: boolean;
-  /** Minimum seeders filter (default: 0) */
   minSeeders?: number;
-  /** TVDB ID for series lookup in Sonarr */
   tvdbId?: number;
-  /** IMDB ID as alternative lookup */
   imdbId?: string;
-  /** Series title for fallback search */
   title?: string;
-  /** Release year for fallback search */
   year?: number;
 }
 
-/**
- * Show a modal quick-picker for selecting a Jellyseerr service.
- * Returns the selected service ID or undefined if cancelled/error.
- */
 async function promptJellyseerrSelection(
   availableServiceIds: string[],
 ): Promise<string | undefined> {
@@ -50,7 +39,7 @@ async function promptJellyseerrSelection(
         })),
         {
           text: "Open Settings",
-          onPress: () => resolve(undefined), // Would navigate to settings in real app
+          onPress: () => resolve(undefined),
           style: "default" as const,
         },
         {
@@ -63,11 +52,6 @@ async function promptJellyseerrSelection(
   });
 }
 
-/**
- * Fetches available releases for a given media item from configured connectors.
- * For Radarr/Sonarr, first looks up the media by TMDB/TVDB/IMDB to get internal IDs,
- * then fetches releases. For Prowlarr, uses TMDB ID directly.
- */
 export const useDiscoverReleases = (
   mediaType: "movie" | "series",
   tmdbId?: number,
@@ -82,7 +66,18 @@ export const useDiscoverReleases = (
     title,
     year,
   } = options;
-  const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
+  const radarrConnectors = useConnectorsStore(
+    selectConnectorsByType("radarr"),
+  ) as RadarrConnector[];
+  const sonarrConnectors = useConnectorsStore(
+    selectConnectorsByType("sonarr"),
+  ) as SonarrConnector[];
+  const prowlarrConnectors = useConnectorsStore(
+    selectConnectorsByType("prowlarr"),
+  ) as ProwlarrConnector[];
+  const jellyseerrConnectors = useConnectorsStore(
+    selectConnectorsByType("jellyseerr"),
+  ) as any[];
 
   return useQuery<NormalizedRelease[], Error>({
     queryKey: queryKeys.discover.releases({
@@ -102,20 +97,13 @@ export const useDiscoverReleases = (
         );
       }
 
-      // Use AbortSignal from TanStack Query to cancel in-flight requests on unmount
       const signal = context.signal;
       const allReleases: NormalizedRelease[] = [];
 
       try {
-        // Fetch from Radarr if searching for movies
         if (mediaType === "movie") {
-          const radarrConnectors = getConnectorsByType(
-            "radarr",
-          ) as RadarrConnector[];
-
           const radarrResults = await Promise.allSettled(
             radarrConnectors.map(async (connector) => {
-              // Early exit if query was cancelled
               if (signal.aborted) {
                 return [] as NormalizedRelease[];
               }
@@ -123,7 +111,6 @@ export const useDiscoverReleases = (
               try {
                 let internalMovieId: number | undefined;
 
-                // Priority 1: Try TMDB lookup if available (direct & accurate)
                 if (tmdbId) {
                   logger.debug(
                     "[useDiscoverReleases] Attempting Radarr TMDB lookup",
@@ -132,7 +119,6 @@ export const useDiscoverReleases = (
                       connectorId: connector.config.id,
                     },
                   );
-                  // Check if connector has lookupByTmdbId (implementation-only method)
                   const connectorWithTmdb = connector as any;
                   if (connectorWithTmdb.lookupByTmdbId) {
                     const movie =
@@ -150,7 +136,6 @@ export const useDiscoverReleases = (
                   }
                 }
 
-                // Priority 2: Fall back to title-based search
                 if (!internalMovieId && title) {
                   logger.debug(
                     "[useDiscoverReleases] Attempting Radarr title-based lookup",
@@ -171,7 +156,6 @@ export const useDiscoverReleases = (
                   }
                 }
 
-                // Priority 3: Fall back to IMDB search
                 if (!internalMovieId && imdbId) {
                   logger.debug(
                     "[useDiscoverReleases] Attempting Radarr IMDB lookup",
@@ -198,7 +182,6 @@ export const useDiscoverReleases = (
                   return [];
                 }
 
-                // Now fetch releases using the internal ID
                 return connector.getReleases(internalMovieId, { minSeeders });
               } catch (error) {
                 logger.warn("Radarr movie lookup or release fetch failed", {
@@ -223,14 +206,8 @@ export const useDiscoverReleases = (
             }
           });
 
-          // Also try Prowlarr for indexer search on movies
-          const prowlarrConnectors = getConnectorsByType(
-            "prowlarr",
-          ) as ProwlarrConnector[];
-
           const prowlarrResults = await Promise.allSettled(
             prowlarrConnectors.map(async (connector) => {
-              // Early exit if query was cancelled
               if (signal.aborted) {
                 return [] as NormalizedRelease[];
               }
@@ -258,20 +235,9 @@ export const useDiscoverReleases = (
           });
         }
 
-        // Fetch from Sonarr if searching for series
         if (mediaType === "series") {
-          const sonarrConnectors = getConnectorsByType(
-            "sonarr",
-          ) as SonarrConnector[];
-
-          // Get all Jellyseerr connectors for Sonarr ID mapping via TMDB
-          const jellyseerrConnectors = getConnectorsByType(
-            "jellyseerr",
-          ) as any[];
-
           const sonarrResults = await Promise.allSettled(
             sonarrConnectors.map(async (connector) => {
-              // Early exit if query was cancelled
               if (signal.aborted) {
                 return [] as NormalizedRelease[];
               }
@@ -279,7 +245,6 @@ export const useDiscoverReleases = (
               try {
                 let internalSeriesId: number | undefined;
 
-                // Priority 1: Try Jellyseerr service lookup for TMDB -> Sonarr mapping
                 if (tmdbId && jellyseerrConnectors.length > 0) {
                   logger.debug(
                     "[useDiscoverReleases] Attempting Jellyseerr Sonarr mapping",
@@ -291,7 +256,6 @@ export const useDiscoverReleases = (
                   let selectedJellyServiceId =
                     useSettingsStore.getState().preferredJellyseerrServiceId;
 
-                  // If no preference set and multiple Jellyseerr services, ask user
                   if (
                     !selectedJellyServiceId &&
                     jellyseerrConnectors.length > 1
@@ -323,7 +287,6 @@ export const useDiscoverReleases = (
                       (j) => j.config.id === selectedJellyServiceId,
                     );
                     if (jellyConnector) {
-                      // Check if connector has serviceLookupForSonarr
                       if (jellyConnector.serviceLookupForSonarr) {
                         const sonarrId =
                           await jellyConnector.serviceLookupForSonarr(tmdbId);
@@ -342,7 +305,6 @@ export const useDiscoverReleases = (
                   }
                 }
 
-                // Priority 2: Fall back to title-based search
                 if (!internalSeriesId && title) {
                   logger.debug(
                     "[useDiscoverReleases] Attempting Sonarr title-based lookup",
@@ -364,7 +326,6 @@ export const useDiscoverReleases = (
                   }
                 }
 
-                // Priority 3: Fall back to IMDB search
                 if (!internalSeriesId && imdbId) {
                   logger.debug(
                     "[useDiscoverReleases] Attempting Sonarr IMDB lookup",
@@ -392,7 +353,6 @@ export const useDiscoverReleases = (
                   return [];
                 }
 
-                // Now fetch releases using the internal ID
                 return connector.getReleases(internalSeriesId, { minSeeders });
               } catch (error) {
                 logger.warn("Sonarr series lookup or release fetch failed", {
@@ -417,14 +377,8 @@ export const useDiscoverReleases = (
             }
           });
 
-          // Also try Prowlarr for indexer search on series
-          const prowlarrConnectors = getConnectorsByType(
-            "prowlarr",
-          ) as ProwlarrConnector[];
-
           const prowlarrResults = await Promise.allSettled(
             prowlarrConnectors.map(async (connector) => {
-              // Early exit if query was cancelled
               if (signal.aborted) {
                 return [] as NormalizedRelease[];
               }
@@ -451,7 +405,6 @@ export const useDiscoverReleases = (
           });
         }
       } catch (error) {
-        // Don't log cancellation errors from AbortSignal
         if (!(error instanceof Error && error.name === "AbortError")) {
           logger.error("Error fetching discover releases", {
             mediaType,
@@ -461,7 +414,6 @@ export const useDiscoverReleases = (
         }
       }
 
-      // Merge, deduplicate, and rank releases
       return mergeAndRankReleases(allReleases, { preferQuality });
     },
   });

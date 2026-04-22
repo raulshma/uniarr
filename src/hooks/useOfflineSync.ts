@@ -24,7 +24,23 @@ export const useOfflineSync = (options: OfflineSyncOptions = {}) => {
 
   const processMutation = useCallback(
     async (queuedMutation: any) => {
-      const { id, mutationFn, queryKey, retryCount } = queuedMutation;
+      const { id, queryKey, retryCount, operationKey } = queuedMutation;
+
+      const mutationExecutor =
+        mutationQueueService.resolveMutationExecutor(queuedMutation);
+
+      if (!mutationExecutor) {
+        await logger.warn(
+          "Queued mutation has no executable function or registered handler; removing.",
+          {
+            location: "useOfflineSync.processMutation",
+            mutationId: id,
+            operationKey,
+          },
+        );
+        await mutationQueueService.removeMutation(id);
+        return;
+      }
 
       try {
         await logger.info("Executing queued mutation", {
@@ -35,7 +51,7 @@ export const useOfflineSync = (options: OfflineSyncOptions = {}) => {
         });
 
         // Execute the mutation
-        await mutationFn();
+        await mutationExecutor();
 
         // Remove from queue on success
         await mutationQueueService.removeMutation(id);
@@ -139,22 +155,29 @@ export const useOfflineSync = (options: OfflineSyncOptions = {}) => {
   }, [isConnected, isInternetReachable, processQueuedMutations]);
 
   const queueMutationForOffline = async (mutationOptions: {
-    mutationFn: () => Promise<unknown>;
+    mutationFn?: () => Promise<unknown>;
     queryKey: readonly unknown[];
     variables?: unknown;
+    operationKey?: string;
+    payload?: unknown;
   }) => {
-    const { mutationFn, queryKey, variables } = mutationOptions;
+    const { mutationFn, queryKey, variables, operationKey, payload } =
+      mutationOptions;
 
     await mutationQueueService.addMutation({
       mutationFn,
       queryKey,
       variables,
+      operationKey,
+      payload,
       maxRetries,
     });
 
     await logger.info("Mutation queued for offline execution", {
       location: "useOfflineSync.queueMutationForOffline",
       queryKey: JSON.stringify(queryKey),
+      operationKey,
+      durable: Boolean(operationKey),
     });
   };
 

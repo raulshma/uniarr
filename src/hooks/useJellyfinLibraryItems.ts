@@ -1,12 +1,10 @@
-// no direct React hooks used
 import { useQuery } from "@tanstack/react-query";
 
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 import type { JellyfinItem } from "@/models/jellyfin.types";
 
@@ -21,21 +19,6 @@ interface UseJellyfinLibraryItemsOptions {
   readonly limit?: number;
 }
 
-const ensureConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): JellyfinConnector => {
-  const connector = getConnector(serviceId);
-
-  if (!connector || connector.config.type !== "jellyfin") {
-    throw new Error(
-      `Jellyfin connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as JellyfinConnector;
-};
-
 export const useJellyfinLibraryItems = ({
   serviceId,
   libraryId,
@@ -46,9 +29,11 @@ export const useJellyfinLibraryItems = ({
   sortOrder,
   limit,
 }: UseJellyfinLibraryItemsOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
+  const connector = useConnectorsStore(selectConnectorById(serviceId ?? ""));
 
-  const enabled = Boolean(serviceId && libraryId);
+  const enabled = Boolean(
+    serviceId && libraryId && connector?.config.type === "jellyfin",
+  );
   const normalizedSearch = searchTerm?.trim() ?? "";
 
   return useQuery<JellyfinItem[]>({
@@ -67,20 +52,28 @@ export const useJellyfinLibraryItems = ({
     staleTime: 30_000,
     placeholderData: (previousData) => previousData ?? [],
     refetchOnWindowFocus: false,
-    queryFn: async () => {
-      if (!serviceId || !libraryId) {
+    queryFn: async ({ signal }) => {
+      if (
+        !serviceId ||
+        !libraryId ||
+        !connector ||
+        connector.config.type !== "jellyfin"
+      ) {
         return [];
       }
 
-      const connector = ensureConnector(getConnector, serviceId);
-      return connector.getLibraryItems(libraryId, {
-        searchTerm: normalizedSearch,
-        includeItemTypes,
-        mediaTypes,
-        sortBy,
-        sortOrder,
-        limit,
-      });
+      return (connector as JellyfinConnector).getLibraryItems(
+        libraryId,
+        {
+          searchTerm: normalizedSearch,
+          includeItemTypes,
+          mediaTypes,
+          sortBy,
+          sortOrder,
+          limit,
+        },
+        { signal },
+      );
     },
   });
 };

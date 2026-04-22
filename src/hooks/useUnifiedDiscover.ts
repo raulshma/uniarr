@@ -3,11 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
-import type { IConnector } from "@/connectors/base/IConnector";
-import type { ServiceType, ServiceConfig } from "@/models/service.types";
+import type { ServiceConfig } from "@/models/service.types";
 import {
   useConnectorsStore,
-  selectGetConnectorsByType,
+  selectConnectorsByType,
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 import type {
@@ -176,15 +175,11 @@ const mapTrendingResult = (
 };
 
 const fetchUnifiedDiscover = async (
-  getConnectorsByType: (type: ServiceType) => IConnector[],
-  options: { tmdbEnabled: boolean },
+  jellyConnectors: JellyseerrConnector[],
+  sonarrConnectors: SonarrConnector[],
+  radarrConnectors: RadarrConnector[],
+  options: { tmdbEnabled: boolean; signal?: AbortSignal },
 ): Promise<UnifiedDiscoverPayload> => {
-  const jellyConnectors = getConnectorsByType(
-    "jellyseerr",
-  ) as JellyseerrConnector[];
-  const sonarrConnectors = getConnectorsByType("sonarr") as SonarrConnector[];
-  const radarrConnectors = getConnectorsByType("radarr") as RadarrConnector[];
-
   const services: UnifiedDiscoverServices = {
     sonarr: mapServiceSummaries(
       sonarrConnectors.map((connector) => connector.config),
@@ -200,7 +195,10 @@ const fetchUnifiedDiscover = async (
   const trendingResponses = await Promise.all(
     jellyConnectors.map(async (connector) => {
       try {
-        const response = await connector.getTrending({ page: 1 });
+        const response = await connector.getTrending(
+          { page: 1 },
+          { signal: options.signal },
+        );
         return {
           connectorId: connector.config.id,
           items: response.items,
@@ -305,8 +303,14 @@ const fetchUnifiedDiscover = async (
     if (tmdbConnector) {
       try {
         const [movieDiscover, tvDiscover] = await Promise.all([
-          tmdbConnector.discoverMovies({ sort_by: "popularity.desc", page: 1 }),
-          tmdbConnector.discoverTv({ sort_by: "popularity.desc", page: 1 }),
+          tmdbConnector.discoverMovies(
+            { sort_by: "popularity.desc", page: 1 },
+            { signal: options.signal },
+          ),
+          tmdbConnector.discoverTv(
+            { sort_by: "popularity.desc", page: 1 },
+            { signal: options.signal },
+          ),
         ]);
 
         const mapWithDedupe = (
@@ -383,14 +387,28 @@ const fetchUnifiedDiscover = async (
 };
 
 export const useUnifiedDiscover = () => {
-  const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
+  const jellyConnectors = useConnectorsStore(
+    selectConnectorsByType("jellyseerr"),
+  ) as JellyseerrConnector[];
+  const sonarrConnectors = useConnectorsStore(
+    selectConnectorsByType("sonarr"),
+  ) as SonarrConnector[];
+  const radarrConnectors = useConnectorsStore(
+    selectConnectorsByType("radarr"),
+  ) as RadarrConnector[];
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const query = useQuery<UnifiedDiscoverPayload>({
     queryKey: queryKeys.discover.unified({ tmdbEnabled }),
-    queryFn: async (context) => {
-      const payload = await fetchUnifiedDiscover(getConnectorsByType, {
-        tmdbEnabled,
-      });
+    queryFn: async ({ signal }) => {
+      const payload = await fetchUnifiedDiscover(
+        jellyConnectors,
+        sonarrConnectors,
+        radarrConnectors,
+        {
+          tmdbEnabled,
+          signal,
+        },
+      );
 
       // Proactively prefetch all images after data loads
       const allItems = payload.sections.flatMap((section) => section.items);

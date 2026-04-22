@@ -81,6 +81,7 @@ export class JellyfinConnector
   private userName?: string;
   private serverVersion?: string;
   private serverName?: string;
+  private authInterceptorId: number | null = null;
 
   // Download connector properties
   public readonly supportsDownloads = true;
@@ -88,27 +89,43 @@ export class JellyfinConnector
   constructor(config: ServiceConfig) {
     super(config);
 
-    this.client.interceptors.request.use((requestConfig) => {
-      const authHeaders = ServiceAuthHelper.getServiceAuthHeaders(this.config);
+    this.authInterceptorId = this.client.interceptors.request.use(
+      (requestConfig) => {
+        const authHeaders = ServiceAuthHelper.getServiceAuthHeaders(
+          this.config,
+        );
 
-      void logger.debug("Jellyfin request interceptor - auth headers", {
-        serviceId: this.config.id,
-        endpoint: requestConfig.url,
-        hasAuthHeaders: Object.keys(authHeaders).length > 0,
-        authHeaderKeys: Object.keys(authHeaders),
-        userId: this.userId,
-        userName: this.userName,
-      });
+        void logger.debug("Jellyfin request interceptor - auth headers", {
+          serviceId: this.config.id,
+          endpoint: requestConfig.url,
+          hasAuthHeaders: Object.keys(authHeaders).length > 0,
+          authHeaderKeys: Object.keys(authHeaders),
+          userId: this.userId,
+          userName: this.userName,
+        });
 
-      // Merge auth headers with existing headers
-      Object.entries(authHeaders).forEach(([key, value]) => {
-        if (value !== undefined && requestConfig.headers) {
-          requestConfig.headers[key] = value;
-        }
-      });
+        // Merge auth headers with existing headers
+        Object.entries(authHeaders).forEach(([key, value]) => {
+          if (value !== undefined && requestConfig.headers) {
+            requestConfig.headers[key] = value;
+          }
+        });
 
-      return requestConfig;
-    });
+        return requestConfig;
+      },
+    );
+  }
+
+  override dispose(): void {
+    if (this.authInterceptorId !== null) {
+      this.client.interceptors.request.eject(this.authInterceptorId);
+      this.authInterceptorId = null;
+    }
+    this.userId = undefined;
+    this.userName = undefined;
+    this.serverVersion = undefined;
+    this.serverName = undefined;
+    super.dispose();
   }
 
   async initialize(): Promise<void> {
@@ -126,7 +143,9 @@ export class JellyfinConnector
     return this.serverVersion ?? "Unknown";
   }
 
-  async getLibraries(): Promise<JellyfinLibraryView[]> {
+  async getLibraries(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<JellyfinLibraryView[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
@@ -137,6 +156,7 @@ export class JellyfinConnector
           params: {
             IncludeHidden: false,
           },
+          ...this.toAxiosConfig(options),
         },
       );
 
@@ -149,6 +169,7 @@ export class JellyfinConnector
   async getResumeItems(
     limit = 20,
     includeTypes: string[] = DEFAULT_RESUME_TYPES,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<JellyfinResumeItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
@@ -167,7 +188,7 @@ export class JellyfinConnector
     try {
       const response = await this.client.get<JellyfinItemsResponse>(
         `/Users/${userId}/Items/Resume`,
-        { params },
+        { params, ...this.toAxiosConfig(options) },
       );
 
       return Array.isArray(response.data?.Items)
@@ -181,6 +202,7 @@ export class JellyfinConnector
   async getLatestItems(
     parentId: string,
     limit = 12,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<JellyfinLatestItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
@@ -200,6 +222,7 @@ export class JellyfinConnector
         `/Users/${userId}/Items/Latest`,
         {
           params,
+          ...this.toAxiosConfig(options),
         },
       );
 
@@ -219,12 +242,9 @@ export class JellyfinConnector
       readonly sortOrder?: "Ascending" | "Descending";
       readonly limit?: number;
       readonly startIndex?: number;
-      /**
-       * Use full item fields including People/Taglines.
-       * @default false - uses optimized fields for better performance
-       */
       readonly includeFullDetails?: boolean;
     } = {},
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<JellyfinItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
@@ -262,7 +282,7 @@ export class JellyfinConnector
     try {
       const response = await this.client.get<JellyfinItemsResponse>(
         `/Users/${userId}/Items`,
-        { params },
+        { params, ...this.toAxiosConfig(requestOptions) },
       );
       return Array.isArray(response.data?.Items)
         ? [...response.data.Items]
@@ -272,7 +292,12 @@ export class JellyfinConnector
     }
   }
 
-  async getItem(itemId: string): Promise<JellyfinItem> {
+  async getItem(
+    itemId: string,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<JellyfinItem> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
@@ -285,6 +310,7 @@ export class JellyfinConnector
             EnableImages: true,
             enableUserData: true,
           },
+          ...this.toAxiosConfig(options),
         },
       );
 
@@ -306,6 +332,7 @@ export class JellyfinConnector
       readonly subtitleStreamIndex?: number;
       readonly maxStreamingBitrate?: number;
     } = {},
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<{
     readonly playback: JellyfinPlaybackInfoResponse;
     readonly mediaSource: JellyfinMediaSource;
@@ -334,7 +361,7 @@ export class JellyfinConnector
 
       const response = await this.client.get<JellyfinPlaybackInfoResponse>(
         `/Items/${itemId}/PlaybackInfo`,
-        { params },
+        { params, ...this.toAxiosConfig(requestOptions) },
       );
 
       const playback = response.data;
@@ -393,14 +420,17 @@ export class JellyfinConnector
     }
   }
 
-  async reportPlaybackStart(options: {
-    readonly itemId: string;
-    readonly mediaSourceId: string;
-    readonly playSessionId?: string;
-    readonly canSeek?: boolean;
-    readonly audioStreamIndex?: number;
-    readonly subtitleStreamIndex?: number;
-  }): Promise<void> {
+  async reportPlaybackStart(
+    options: {
+      readonly itemId: string;
+      readonly mediaSourceId: string;
+      readonly playSessionId?: string;
+      readonly canSeek?: boolean;
+      readonly audioStreamIndex?: number;
+      readonly subtitleStreamIndex?: number;
+    },
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
       await this.ensureAuthenticated();
 
@@ -413,29 +443,35 @@ export class JellyfinConnector
         SubtitleStreamIndex: options.subtitleStreamIndex ?? null,
       };
 
-      await this.client.post("/Sessions/Playing", payload);
+      await this.client.post(
+        "/Sessions/Playing",
+        payload,
+        this.toAxiosConfig(requestOptions),
+      );
     } catch (error) {
       await logger.warn("Failed to report Jellyfin playback start.", {
         serviceId: this.config.id,
         itemId: options.itemId,
         error,
       });
-      // Don't throw - playback reporting is non-critical
     }
   }
 
-  async reportPlaybackProgress(options: {
-    readonly itemId: string;
-    readonly mediaSourceId: string;
-    readonly playSessionId?: string;
-    readonly positionTicks: number;
-    readonly isPaused?: boolean;
-    readonly isMuted?: boolean;
-    readonly volumeLevel?: number;
-    readonly audioStreamIndex?: number;
-    readonly subtitleStreamIndex?: number;
-    readonly playbackRate?: number;
-  }): Promise<void> {
+  async reportPlaybackProgress(
+    options: {
+      readonly itemId: string;
+      readonly mediaSourceId: string;
+      readonly playSessionId?: string;
+      readonly positionTicks: number;
+      readonly isPaused?: boolean;
+      readonly isMuted?: boolean;
+      readonly volumeLevel?: number;
+      readonly audioStreamIndex?: number;
+      readonly subtitleStreamIndex?: number;
+      readonly playbackRate?: number;
+    },
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
       await this.ensureAuthenticated();
 
@@ -455,23 +491,29 @@ export class JellyfinConnector
         PlaybackRate: options.playbackRate ?? null,
       };
 
-      await this.client.post("/Sessions/Playing/Progress", payload);
+      await this.client.post(
+        "/Sessions/Playing/Progress",
+        payload,
+        this.toAxiosConfig(requestOptions),
+      );
     } catch (error) {
       await logger.warn("Failed to report Jellyfin playback progress.", {
         serviceId: this.config.id,
         itemId: options.itemId,
         error,
       });
-      // Don't throw - playback reporting is non-critical
     }
   }
 
-  async reportPlaybackStopped(options: {
-    readonly itemId: string;
-    readonly mediaSourceId: string;
-    readonly playSessionId?: string;
-    readonly positionTicks?: number;
-  }): Promise<void> {
+  async reportPlaybackStopped(
+    options: {
+      readonly itemId: string;
+      readonly mediaSourceId: string;
+      readonly playSessionId?: string;
+      readonly positionTicks?: number;
+    },
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
       await this.ensureAuthenticated();
 
@@ -483,7 +525,11 @@ export class JellyfinConnector
         Failed: false,
       };
 
-      await this.client.post("/Sessions/Playing/Stopped", payload);
+      await this.client.post(
+        "/Sessions/Playing/Stopped",
+        payload,
+        this.toAxiosConfig(requestOptions),
+      );
     } catch (error) {
       await logger.warn("Failed to report Jellyfin playback stop.", {
         serviceId: this.config.id,
@@ -491,13 +537,13 @@ export class JellyfinConnector
         mediaSourceId: options.mediaSourceId,
         error,
       });
-      // Don't throw - playback reporting is non-critical
     }
   }
 
   async refreshItemMetadata(
     itemId: string,
     replaceAllMetadata = false,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     await this.ensureAuthenticated();
 
@@ -507,6 +553,7 @@ export class JellyfinConnector
           ReplaceAllMetadata: replaceAllMetadata,
           ReplaceImages: false,
         },
+        ...this.toAxiosConfig(options),
       });
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
@@ -516,6 +563,7 @@ export class JellyfinConnector
   async search(
     query: string,
     options?: SearchOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<JellyfinItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
@@ -551,7 +599,7 @@ export class JellyfinConnector
     try {
       const response = await this.client.get<JellyfinSearchHintResult>(
         `/Search/Hints`,
-        { params },
+        { params, ...this.toAxiosConfig(requestOptions) },
       );
 
       // Convert search hints back to JellyfinItem-like format for compatibility
@@ -629,16 +677,12 @@ export class JellyfinConnector
     return `${base}/Persons/${encodedPerson}/Images/Primary${query.length ? `?${query}` : ""}`;
   }
 
-  async getNowPlayingSessions(): Promise<JellyfinSession[]> {
+  async getNowPlayingSessions(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<JellyfinSession[]> {
     await this.ensureAuthenticated();
 
     try {
-      // Request recent sessions from the server. Previously we filtered by
-      // ControllableByUserId which caused many legitimate playback sessions
-      // (for example sessions the user owns but cannot remote-control) to be
-      // excluded by the server. Instead, request sessions in general and
-      // perform client-side filtering to include sessions that belong to the
-      // current user (or list them as active).
       const response = await this.client.get<readonly JellyfinSession[]>(
         "/Sessions",
         {
@@ -648,6 +692,7 @@ export class JellyfinConnector
             enableUserData: true,
             Fields: DEFAULT_ITEM_FIELDS,
           },
+          ...this.toAxiosConfig(options),
         },
       );
 
@@ -691,6 +736,7 @@ export class JellyfinConnector
       readonly seekPositionTicks?: number;
       readonly controllingUserId?: string;
     } = {},
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     await this.ensureAuthenticated();
 
@@ -706,25 +752,35 @@ export class JellyfinConnector
       await this.client.post(
         `/Sessions/${sessionId}/Playing/${command}`,
         undefined,
-        { params },
+        { params, ...this.toAxiosConfig(requestOptions) },
       );
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
     }
   }
 
-  async setVolume(sessionId: string, volumePercent: number): Promise<void> {
+  async setVolume(
+    sessionId: string,
+    volumePercent: number,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<void> {
     await this.ensureAuthenticated();
 
     const clamped = Math.max(0, Math.min(100, Math.round(volumePercent)));
 
     try {
-      await this.client.post(`/Sessions/${sessionId}/Command`, {
-        Name: "SetVolume",
-        Arguments: {
-          Volume: String(clamped),
+      await this.client.post(
+        `/Sessions/${sessionId}/Command`,
+        {
+          Name: "SetVolume",
+          Arguments: {
+            Volume: String(clamped),
+          },
         },
-      });
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
     }
@@ -845,11 +901,16 @@ export class JellyfinConnector
    * Fetch all users from the Jellyfin server
    * Requires admin API key
    */
-  async getUsers(): Promise<JellyfinUserProfile[]> {
+  async getUsers(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<JellyfinUserProfile[]> {
     await this.ensureAuthenticated();
 
     try {
-      const response = await this.client.get<JellyfinUserProfile[]>("/Users");
+      const response = await this.client.get<JellyfinUserProfile[]>(
+        "/Users",
+        this.toAxiosConfig(options),
+      );
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
@@ -921,16 +982,20 @@ export class JellyfinConnector
    * Requires admin permissions.
    * Parses Jellyfin log format and normalizes to unified ServiceLog format.
    */
-  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+  override async getLogs(
+    options?: LogQueryOptions,
+    requestOptions?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<ServiceLog[]> {
     await this.ensureAuthenticated();
 
     try {
       // Jellyfin's /System/Logs endpoint returns a list of log files
       // We'll fetch the main log file and parse it
-      const response =
-        await this.client.get<
-          { Name: string; DateModified: string; Size: number }[]
-        >("/System/Logs");
+      const response = await this.client.get<
+        { Name: string; DateModified: string; Size: number }[]
+      >("/System/Logs", this.toAxiosConfig(requestOptions));
 
       if (!response.data || response.data.length === 0) {
         return [];
@@ -957,6 +1022,7 @@ export class JellyfinConnector
           },
           responseType: "text",
           transformResponse: (data) => data,
+          ...this.toAxiosConfig(requestOptions),
         },
       );
 
@@ -1123,13 +1189,17 @@ export class JellyfinConnector
   /**
    * Check if a specific content item can be downloaded
    */
-  async canDownload(contentId: string): Promise<DownloadCapability> {
+  async canDownload(
+    contentId: string,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<DownloadCapability> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
     try {
-      // Get the item details to check if it can be downloaded
-      const item = await this.getItem(contentId);
+      const item = await this.getItem(contentId, options);
 
       // Movies, episodes, and series can be downloaded
       if (
@@ -1148,7 +1218,7 @@ export class JellyfinConnector
 
       // For series, check if there are episodes available
       if (item.Type === "Series") {
-        const episodes = await this.getSeriesEpisodes(contentId);
+        const episodes = await this.getSeriesEpisodes(contentId, options);
         if (!episodes || episodes.length === 0) {
           return {
             canDownload: false,
@@ -1170,7 +1240,11 @@ export class JellyfinConnector
       }
 
       // Check if user has permission to download this content
-      const canDownload = await this.checkDownloadPermission(item, userId);
+      const canDownload = await this.checkDownloadPermission(
+        item,
+        userId,
+        options,
+      );
 
       if (!canDownload) {
         return {
@@ -1180,8 +1254,7 @@ export class JellyfinConnector
         };
       }
 
-      // Get media sources to determine download capabilities
-      const mediaSources = await this.getMediaSources(contentId);
+      const mediaSources = await this.getMediaSources(contentId, options);
 
       if (!mediaSources || mediaSources.length === 0) {
         return {
@@ -1192,7 +1265,10 @@ export class JellyfinConnector
       }
 
       // Get available quality options
-      const qualityOptions = await this.getDownloadQualities(contentId);
+      const qualityOptions = await this.getDownloadQualities(
+        contentId,
+        options,
+      );
 
       // Estimate file size based on quality and duration
       const estimatedSize = this.estimateFileSize(item, qualityOptions[0]);
@@ -1227,12 +1303,12 @@ export class JellyfinConnector
     contentId: string,
     quality?: string,
     episodeIds?: readonly string[],
+    options?: { readonly signal?: AbortSignal },
   ): Promise<DownloadInfo> {
     await this.ensureAuthenticated();
 
     try {
-      // Get item details
-      const item = await this.getItem(contentId);
+      const item = await this.getItem(contentId, options);
 
       // If this is a series and episodeIds are provided, download the first episode
       // and let the download manager queue the rest as individual downloads
@@ -1251,8 +1327,7 @@ export class JellyfinConnector
         }
       }
 
-      // Get media sources for the download item
-      const mediaSources = await this.getMediaSources(downloadItemId);
+      const mediaSources = await this.getMediaSources(downloadItemId, options);
       if (!mediaSources || mediaSources.length === 0) {
         throw new Error("No media sources available for download");
       }
@@ -1306,11 +1381,12 @@ export class JellyfinConnector
    */
   async getContentMetadata(
     contentId: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<DownloadContentMetadata> {
     await this.ensureAuthenticated();
 
     try {
-      const item = await this.getItem(contentId);
+      const item = await this.getItem(contentId, options);
 
       const metadata: DownloadContentMetadata = {
         id: item.Id || "",
@@ -1354,6 +1430,7 @@ export class JellyfinConnector
   async getContentThumbnail(
     contentId: string,
     options?: { readonly width?: number; readonly height?: number },
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<string | undefined> {
     try {
       const imageOptions: any = {};
@@ -1375,11 +1452,12 @@ export class JellyfinConnector
    */
   async getDownloadQualities(
     contentId: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<readonly QualityOption[]> {
     await this.ensureAuthenticated();
 
     try {
-      const mediaSources = await this.getMediaSources(contentId);
+      const mediaSources = await this.getMediaSources(contentId, options);
       if (!mediaSources || mediaSources.length === 0) {
         return [];
       }
@@ -1402,10 +1480,17 @@ export class JellyfinConnector
   /**
    * Validate that a download URL is still valid and accessible
    */
-  async validateDownloadUrl(downloadUrl: string): Promise<boolean> {
+  async validateDownloadUrl(
+    downloadUrl: string,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<boolean> {
     try {
-      // Make a HEAD request to check if the URL is accessible
-      const response = await this.client.head(downloadUrl);
+      const response = await this.client.head(
+        downloadUrl,
+        this.toAxiosConfig(options),
+      );
       return response.status === 200;
     } catch (error) {
       logger.warn("Download URL validation failed", {
@@ -1422,9 +1507,9 @@ export class JellyfinConnector
   async refreshDownloadUrl(
     contentId: string,
     currentUrl: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<string> {
-    // For Jellyfin, we can generate a fresh URL
-    const mediaSources = await this.getMediaSources(contentId);
+    const mediaSources = await this.getMediaSources(contentId, options);
     if (!mediaSources || mediaSources.length === 0) {
       throw new Error("No media sources available");
     }
@@ -1444,24 +1529,31 @@ export class JellyfinConnector
   /**
    * Get download requirements or restrictions for the user
    */
-  async getDownloadRequirements(contentId: string): Promise<readonly string[]> {
+  async getDownloadRequirements(
+    contentId: string,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<readonly string[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
     try {
-      const item = await this.getItem(contentId);
+      const item = await this.getItem(contentId, options);
       const requirements: string[] = [];
 
-      // Check if user has appropriate permissions
-      const canDownload = await this.checkDownloadPermission(item, userId);
+      const canDownload = await this.checkDownloadPermission(
+        item,
+        userId,
+        options,
+      );
       if (!canDownload) {
         requirements.push(
           "You must have download permissions for this content",
         );
       }
 
-      // Check storage requirements
-      const mediaSources = await this.getMediaSources(contentId);
+      const mediaSources = await this.getMediaSources(contentId, options);
       if (mediaSources && mediaSources.length > 0) {
         const estimatedSize = this.estimateFileSize(item, mediaSources[0]);
         requirements.push(
@@ -1549,12 +1641,39 @@ export class JellyfinConnector
    * Check if user has permission to download the item
    */
   private async checkDownloadPermission(
-    item: any,
+    item: { Type?: string; IsPlaceHolder?: boolean | null } | null,
     userId: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<boolean> {
-    // For now, assume all authenticated users can download
-    // In a real implementation, you would check user permissions
-    return true;
+    if (!item) return false;
+
+    try {
+      const response = await this.client.get(
+        `/Users/${userId}`,
+        this.toAxiosConfig(options),
+      );
+      const policy = response.data?.Policy as
+        | { EnableMediaPlayback?: boolean; EnableContentDownloading?: boolean }
+        | undefined;
+
+      if (!policy) return true;
+
+      if (policy.EnableMediaPlayback === false) return false;
+      if (policy.EnableContentDownloading === false) return false;
+
+      return true;
+    } catch (error) {
+      void logger.warn(
+        "Unable to verify Jellyfin download permission; defaulting to allowed",
+        {
+          serviceId: this.config.id,
+          userId,
+          itemId: (item as { Id?: string }).Id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return true;
+    }
   }
 
   /**
@@ -1562,10 +1681,14 @@ export class JellyfinConnector
    * Note: This endpoint only works for playable items (movies, episodes).
    * Series and other container types will return an empty array.
    */
-  private async getMediaSources(itemId: string): Promise<any[]> {
+  private async getMediaSources(
+    itemId: string,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<any[]> {
     try {
-      // First check if the item is a Series or other non-playable type
-      const item = await this.getItem(itemId);
+      const item = await this.getItem(itemId, options);
 
       // Series and other container types don't have media sources
       if (
@@ -1577,7 +1700,10 @@ export class JellyfinConnector
       }
 
       // Only playable items (Movie, Episode, etc.) have PlaybackInfo
-      const response = await this.client.get(`/Items/${itemId}/PlaybackInfo`);
+      const response = await this.client.get(
+        `/Items/${itemId}/PlaybackInfo`,
+        this.toAxiosConfig(options),
+      );
       return response.data?.MediaSources ?? [];
     } catch (error) {
       logger.error("Failed to get media sources", {
@@ -1591,7 +1717,12 @@ export class JellyfinConnector
   /**
    * Get episodes for a TV series
    */
-  async getSeriesEpisodes(seriesId: string): Promise<JellyfinItem[]> {
+  async getSeriesEpisodes(
+    seriesId: string,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<JellyfinItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
@@ -1616,6 +1747,7 @@ export class JellyfinConnector
               startIndex,
               limit: pageSize,
             },
+            ...this.toAxiosConfig(options),
           },
         );
 
@@ -1650,6 +1782,7 @@ export class JellyfinConnector
   async getNextUpEpisode(
     seriesId: string,
     currentItemId?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<JellyfinItem | undefined> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
@@ -1669,7 +1802,7 @@ export class JellyfinConnector
     try {
       const response = await this.client.get<JellyfinItemsResponse>(
         "/Shows/NextUp",
-        { params },
+        { params, ...this.toAxiosConfig(options) },
       );
 
       const items = Array.isArray(response.data?.Items)
@@ -1693,7 +1826,7 @@ export class JellyfinConnector
     }
 
     try {
-      const episodes = await this.getSeriesEpisodes(seriesId);
+      const episodes = await this.getSeriesEpisodes(seriesId, options);
       if (episodes.length === 0) {
         return undefined;
       }

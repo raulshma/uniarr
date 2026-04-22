@@ -8,9 +8,8 @@ import type {
 } from "@/models/jellyfin.types";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 
 interface UseJellyfinPlaybackInfoOptions {
   readonly serviceId?: string;
@@ -29,21 +28,6 @@ export interface JellyfinPlaybackInfoResult {
   readonly streamUrl: string;
 }
 
-const ensureConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): JellyfinConnector => {
-  const connector = getConnector(serviceId);
-
-  if (!connector || connector.config.type !== "jellyfin") {
-    throw new Error(
-      `Jellyfin connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as JellyfinConnector;
-};
-
 export const useJellyfinPlaybackInfo = (
   options: UseJellyfinPlaybackInfoOptions,
 ) => {
@@ -58,8 +42,10 @@ export const useJellyfinPlaybackInfo = (
     disableRefetch = true,
   } = options;
 
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const isEnabled = Boolean(enabled && serviceId && itemId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId ?? ""));
+  const isEnabled = Boolean(
+    enabled && serviceId && itemId && connector?.config.type === "jellyfin",
+  );
 
   return useQuery<JellyfinPlaybackInfoResult>({
     queryKey:
@@ -75,18 +61,21 @@ export const useJellyfinPlaybackInfo = (
     staleTime: disableRefetch ? Infinity : 30_000,
     refetchOnWindowFocus: !disableRefetch,
     refetchOnReconnect: !disableRefetch,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!serviceId || !itemId) {
         throw new Error("Jellyfin playback requires service and item id.");
       }
 
-      const connector = ensureConnector(getConnector, serviceId);
-      return connector.getPlaybackInfo(itemId, {
-        mediaSourceId,
-        audioStreamIndex,
-        subtitleStreamIndex,
-        maxStreamingBitrate,
-      });
+      return (connector as JellyfinConnector).getPlaybackInfo(
+        itemId,
+        {
+          mediaSourceId,
+          audioStreamIndex,
+          subtitleStreamIndex,
+          maxStreamingBitrate,
+        },
+        { signal },
+      );
     },
   });
 };

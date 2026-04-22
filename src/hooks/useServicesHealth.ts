@@ -90,103 +90,104 @@ export const useServicesHealth = (): ServicesHealthData => {
 
   // Create stable query function factory to prevent recreation
   const createHealthQueryFn = useMemo(() => {
-    return (serviceId: string) => async () => {
-      const connector = connectorManager.getConnector(serviceId);
-      if (!connector) {
-        // Shouldn't happen for activeServiceIds, but guard defensively
-        throw new Error(`Service connector not found: ${serviceId}`);
-      }
-
-      const config = connector.config;
-      const checkedAt = new Date();
-
-      try {
-        logger.debug(
-          `[useServicesHealth] Testing connection to ${serviceId} (${config.name})`,
-        );
-
-        // Test individual service connection with shorter timeout for better UX
-        const result = await Promise.race([
-          connector.testConnection(),
-          new Promise((resolve) => {
-            // Reduced timeout to 5 seconds for individual services
-            setTimeout(() => {
-              logger.warn(
-                `[useServicesHealth] Health check timeout for ${serviceId}`,
-              );
-              resolve({
-                success: false,
-                message: "Health check timeout",
-                latency: 5000,
-              });
-            }, 5000);
-          }),
-        ]);
-
-        // Type assertion for the result
-        const connectionResult = result as {
-          success?: boolean;
-          message?: string;
-          latency?: number;
-          version?: string;
-        };
-
-        // Derive status similar to the existing useServiceHealth hook
-        const latency = connectionResult.latency ?? undefined;
-        const version = connectionResult.version ?? undefined;
-        const isHighLatency = typeof latency === "number" && latency > 2000;
-
-        let status: ServiceStatusState;
-        if (!config.enabled) {
-          status = "offline";
-        } else if (connectionResult.success) {
-          status = isHighLatency ? "degraded" : "online";
-        } else {
-          status = "offline";
+    return (serviceId: string) =>
+      async ({ signal }: { signal: AbortSignal }) => {
+        const connector = connectorManager.getConnector(serviceId);
+        if (!connector) {
+          // Shouldn't happen for activeServiceIds, but guard defensively
+          throw new Error(`Service connector not found: ${serviceId}`);
         }
 
-        const descriptionParts: string[] = [];
-        if (connectionResult.message) {
-          descriptionParts.push(connectionResult.message);
+        const config = connector.config;
+        const checkedAt = new Date();
+
+        try {
+          logger.debug(
+            `[useServicesHealth] Testing connection to ${serviceId} (${config.name})`,
+          );
+
+          // Test individual service connection with shorter timeout for better UX
+          const result = await Promise.race([
+            connector.testConnection(),
+            new Promise((resolve) => {
+              // Reduced timeout to 5 seconds for individual services
+              setTimeout(() => {
+                logger.warn(
+                  `[useServicesHealth] Health check timeout for ${serviceId}`,
+                );
+                resolve({
+                  success: false,
+                  message: "Health check timeout",
+                  latency: 5000,
+                });
+              }, 5000);
+            }),
+          ]);
+
+          // Type assertion for the result
+          const connectionResult = result as {
+            success?: boolean;
+            message?: string;
+            latency?: number;
+            version?: string;
+          };
+
+          // Derive status similar to the existing useServiceHealth hook
+          const latency = connectionResult.latency ?? undefined;
+          const version = connectionResult.version ?? undefined;
+          const isHighLatency = typeof latency === "number" && latency > 2000;
+
+          let status: ServiceStatusState;
+          if (!config.enabled) {
+            status = "offline";
+          } else if (connectionResult.success) {
+            status = isHighLatency ? "degraded" : "online";
+          } else {
+            status = "offline";
+          }
+
+          const descriptionParts: string[] = [];
+          if (connectionResult.message) {
+            descriptionParts.push(connectionResult.message);
+          }
+          if (typeof latency === "number") {
+            descriptionParts.push(`Latency ${latency}ms`);
+          }
+          if (version) {
+            descriptionParts.push(`Version ${version}`);
+          }
+
+          const statusDescription =
+            descriptionParts.length > 0
+              ? descriptionParts.join(" • ")
+              : undefined;
+
+          logger.debug(
+            `[useServicesHealth] ${serviceId} status: ${status}, description: ${statusDescription}`,
+          );
+
+          return {
+            status,
+            statusDescription,
+            lastCheckedAt: checkedAt,
+            latency,
+            version,
+          };
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
+          logger.error(
+            `[useServicesHealth] Health check failed for ${serviceId}:`,
+            { error: errorMessage },
+          );
+
+          return {
+            status: "offline",
+            statusDescription: errorMessage,
+            lastCheckedAt: checkedAt,
+          };
         }
-        if (typeof latency === "number") {
-          descriptionParts.push(`Latency ${latency}ms`);
-        }
-        if (version) {
-          descriptionParts.push(`Version ${version}`);
-        }
-
-        const statusDescription =
-          descriptionParts.length > 0
-            ? descriptionParts.join(" • ")
-            : undefined;
-
-        logger.debug(
-          `[useServicesHealth] ${serviceId} status: ${status}, description: ${statusDescription}`,
-        );
-
-        return {
-          status,
-          statusDescription,
-          lastCheckedAt: checkedAt,
-          latency,
-          version,
-        };
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        logger.error(
-          `[useServicesHealth] Health check failed for ${serviceId}:`,
-          { error: errorMessage },
-        );
-
-        return {
-          status: "offline",
-          statusDescription: errorMessage,
-          lastCheckedAt: checkedAt,
-        };
-      }
-    };
+      };
   }, [connectorManager]);
 
   // Create health queries for all services with stable configuration

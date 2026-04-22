@@ -157,7 +157,14 @@ export abstract class BaseConnector<
       };
     } catch (error) {
       // Diagnose VPN-specific issues
-      const vpnIssues = diagnoseVpnIssues(error, this.config.type);
+      const vpnIssues = diagnoseVpnIssues(
+        error as {
+          code?: string;
+          message?: string;
+          response?: { status?: number };
+        },
+        this.config.type,
+      );
 
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
@@ -294,7 +301,7 @@ export abstract class BaseConnector<
           statusText: response.statusText,
           headers: response.headers,
           dataType: typeof response.data,
-          dataLength: response.data ? JSON.stringify(response.data).length : 0,
+          dataLength: Number(response.headers?.["content-length"]) || 0,
         });
 
         return response;
@@ -448,6 +455,18 @@ export abstract class BaseConnector<
       serviceId: this.config.id,
       serviceType: this.config.type,
     }).message;
+  }
+
+  protected toAxiosConfig(
+    options?: { readonly signal?: AbortSignal },
+    extra?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!options?.signal && !extra) return {};
+    const config: Record<string, unknown> = { ...extra };
+    if (options?.signal) {
+      config.signal = options.signal;
+    }
+    return config;
   }
 
   /**

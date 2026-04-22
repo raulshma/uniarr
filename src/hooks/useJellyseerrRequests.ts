@@ -11,9 +11,8 @@ import {
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 import type {
   components,
@@ -52,21 +51,6 @@ type DeleteVariables = {
 
 type CreateVariables = CreateJellyseerrRequest;
 
-const ensureConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): JellyseerrConnector => {
-  const connector = getConnector(serviceId);
-
-  if (!connector || connector.config.type !== JELLYSEERR_SERVICE_TYPE) {
-    throw new Error(
-      `Jellyseerr connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as JellyseerrConnector;
-};
-
 const sanitizeQueryOptions = (
   options?: JellyseerrRequestQueryOptions,
 ): JellyseerrRequestQueryOptions | undefined => {
@@ -76,8 +60,6 @@ const sanitizeQueryOptions = (
 
   const sanitized: JellyseerrRequestQueryOptions = {};
 
-  // Only include query parameters that are present in the OpenAPI spec for
-  // the /request endpoint.
   if (typeof options.take === "number") sanitized.take = options.take;
   if (typeof options.skip === "number") sanitized.skip = options.skip;
   if (options.filter && options.filter !== "all")
@@ -131,11 +113,12 @@ export const useJellyseerrRequests = (
   options?: JellyseerrRequestQueryOptions,
 ): UseJellyseerrRequestsResult => {
   const queryClient = useQueryClient();
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
   const previousRequestIdsRef = useRef<Set<number>>(new Set());
   const hasHydratedRef = useRef(false);
+
+  const jellyseerrConnector = connector as JellyseerrConnector | undefined;
 
   const normalizedOptions = useMemo(
     () => sanitizeQueryOptions(options),
@@ -147,16 +130,13 @@ export const useJellyseerrRequests = (
     [normalizedOptions],
   );
 
-  const resolveConnector = useCallback(
-    () => ensureConnector(getConnector, serviceId),
-    [getConnector, serviceId],
-  );
-
   const requestsQuery = useQuery<JellyseerrRequestList, Error>({
     queryKey: queryKeys.jellyseerr.requestsList(serviceId, queryKeyParams),
-    queryFn: async () => {
-      const connector = resolveConnector();
-      return connector.getRequests(normalizedOptions);
+    queryFn: async ({ signal }) => {
+      return (jellyseerrConnector as JellyseerrConnector).getRequests(
+        normalizedOptions,
+        { signal },
+      );
     },
     enabled: hasConnector,
     staleTime: 30 * 1000,
@@ -173,8 +153,9 @@ export const useJellyseerrRequests = (
   const createMutation = useMutation<JellyseerrRequest, Error, CreateVariables>(
     {
       mutationFn: async (payload) => {
-        const connector = resolveConnector();
-        return connector.createRequest(payload);
+        return (jellyseerrConnector as JellyseerrConnector).createRequest(
+          payload,
+        );
       },
       onSuccess: async () => {
         await invalidateRequests();
@@ -188,8 +169,10 @@ export const useJellyseerrRequests = (
     ApproveVariables
   >({
     mutationFn: async ({ requestId, options: mutationOptions }) => {
-      const connector = resolveConnector();
-      return connector.approveRequest(requestId, mutationOptions);
+      return (jellyseerrConnector as JellyseerrConnector).approveRequest(
+        requestId,
+        mutationOptions,
+      );
     },
     onSuccess: async () => {
       await invalidateRequests();
@@ -202,8 +185,10 @@ export const useJellyseerrRequests = (
     DeclineVariables
   >({
     mutationFn: async ({ requestId, options: mutationOptions }) => {
-      const connector = resolveConnector();
-      return connector.declineRequest(requestId, mutationOptions);
+      return (jellyseerrConnector as JellyseerrConnector).declineRequest(
+        requestId,
+        mutationOptions,
+      );
     },
     onSuccess: async () => {
       await invalidateRequests();
@@ -212,8 +197,9 @@ export const useJellyseerrRequests = (
 
   const deleteMutation = useMutation<boolean, Error, DeleteVariables>({
     mutationFn: async ({ requestId }) => {
-      const connector = resolveConnector();
-      return connector.deleteRequest(requestId);
+      return (jellyseerrConnector as JellyseerrConnector).deleteRequest(
+        requestId,
+      );
     },
     onSuccess: async () => {
       await invalidateRequests();
@@ -231,10 +217,7 @@ export const useJellyseerrRequests = (
       return;
     }
 
-    const connector = getConnector(serviceId) as
-      | JellyseerrConnector
-      | undefined;
-    const serviceName = connector?.config.name ?? "Jellyseerr";
+    const serviceName = jellyseerrConnector?.config.name ?? "Jellyseerr";
     const previousIds = previousRequestIdsRef.current;
     const hasHydrated = hasHydratedRef.current;
     const nextIds = new Set<number>();
@@ -246,7 +229,6 @@ export const useJellyseerrRequests = (
         continue;
       }
 
-      // In the OpenAPI types request.status is numeric: 1 == pending
       if (!previousIds.has(request.id) && request.status === 1) {
         void notificationEventService.notifyNewRequest({
           serviceId,
@@ -258,7 +240,7 @@ export const useJellyseerrRequests = (
 
     previousRequestIdsRef.current = nextIds;
     hasHydratedRef.current = true;
-  }, [hasConnector, items, getConnector, serviceId]);
+  }, [hasConnector, items, connector, serviceId, jellyseerrConnector]);
 
   return {
     requests: items,

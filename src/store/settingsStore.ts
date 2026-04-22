@@ -132,7 +132,9 @@ type SettingsData = {
   recommendationModel?: string;
   recommendationKeyId?: string;
   // Default dashboard preference
-  defaultDashboard: "main" | "widgets";
+  defaultDashboard: "main" | "widgets" | "timeline";
+  // Experimental: timeline dashboard with sidebar + event timeline
+  experimentalTimelineDashboardEnabled: boolean;
 };
 
 interface SettingsState extends SettingsData {
@@ -218,7 +220,8 @@ interface SettingsState extends SettingsData {
   setRecommendationProvider: (provider: string | undefined) => void;
   setRecommendationModel: (model: string | undefined) => void;
   setRecommendationKeyId: (keyId: string | undefined) => void;
-  setDefaultDashboard: (dashboard: "main" | "widgets") => void;
+  setDefaultDashboard: (dashboard: "main" | "widgets" | "timeline") => void;
+  setExperimentalTimelineDashboardEnabled: (enabled: boolean) => void;
 }
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
@@ -372,6 +375,7 @@ const createDefaultSettings = (): SettingsData => ({
   recommendationModel: undefined,
   recommendationKeyId: undefined,
   defaultDashboard: "main",
+  experimentalTimelineDashboardEnabled: false,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -523,8 +527,10 @@ export const useSettingsStore = create<SettingsState>()(
         set({ recommendationModel: model }),
       setRecommendationKeyId: (keyId: string | undefined) =>
         set({ recommendationKeyId: keyId }),
-      setDefaultDashboard: (dashboard: "main" | "widgets") =>
+      setDefaultDashboard: (dashboard: "main" | "widgets" | "timeline") =>
         set({ defaultDashboard: dashboard }),
+      setExperimentalTimelineDashboardEnabled: (enabled: boolean) =>
+        set({ experimentalTimelineDashboardEnabled: enabled }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -613,9 +619,11 @@ export const useSettingsStore = create<SettingsState>()(
         recommendationModel: state.recommendationModel,
         recommendationKeyId: state.recommendationKeyId,
         defaultDashboard: state.defaultDashboard,
+        experimentalTimelineDashboardEnabled:
+          state.experimentalTimelineDashboardEnabled,
       }),
       // Bump version since we're adding new persisted fields
-      version: 21,
+      version: 22,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -722,6 +730,10 @@ export const useSettingsStore = create<SettingsState>()(
         // Ensure trailerFeatureEnabled is properly initialized
         if (typeof state.trailerFeatureEnabled !== "boolean") {
           state.trailerFeatureEnabled = false;
+        }
+
+        if (typeof state.experimentalTimelineDashboardEnabled !== "boolean") {
+          state.experimentalTimelineDashboardEnabled = false;
         }
 
         // Ensure recommendation preferences are properly initialized
@@ -955,6 +967,10 @@ export const useSettingsStore = create<SettingsState>()(
           recommendationKeyId: partial.recommendationKeyId ?? undefined,
           defaultDashboard:
             partial.defaultDashboard ?? baseDefaults.defaultDashboard,
+          experimentalTimelineDashboardEnabled:
+            typeof partial.experimentalTimelineDashboardEnabled === "boolean"
+              ? partial.experimentalTimelineDashboardEnabled
+              : baseDefaults.experimentalTimelineDashboardEnabled,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -1063,7 +1079,10 @@ export const selectRecommendationKeyId = (
 ): string | undefined => state.recommendationKeyId;
 export const selectDefaultDashboard = (
   state: SettingsState,
-): "main" | "widgets" => state.defaultDashboard;
+): "main" | "widgets" | "timeline" => state.defaultDashboard;
+export const selectExperimentalTimelineDashboardEnabled = (
+  state: SettingsState,
+): boolean => state.experimentalTimelineDashboardEnabled;
 export const selectTmdbEnabled = (state: SettingsState): boolean =>
   state.tmdbEnabled;
 export const selectMaxImageCacheSize = (state: SettingsState): number =>

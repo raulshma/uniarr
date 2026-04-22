@@ -3,7 +3,7 @@ import type { RadarrConnector } from "@/connectors/implementations/RadarrConnect
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import {
   useConnectorsStore,
-  selectGetConnectorsByType,
+  selectConnectorsByType,
 } from "@/store/connectorsStore";
 import { logger } from "@/services/logger/LoggerService";
 import type {
@@ -41,7 +41,9 @@ interface CheckItemParams {
 
 const checkItemsInLibrary = async (
   items: CheckItemParams[],
-  getConnectorsByType: ReturnType<typeof selectGetConnectorsByType>,
+  radarrConnectors: RadarrConnector[],
+  sonarrConnectors: SonarrConnector[],
+  signal?: AbortSignal,
 ): Promise<Map<string, FoundService>> => {
   const result = new Map<string, FoundService>();
 
@@ -50,19 +52,13 @@ const checkItemsInLibrary = async (
   }
 
   try {
-    // Separate items by media type
     const movieItems = items.filter((item) => item.mediaType === "movie");
     const seriesItems = items.filter((item) => item.mediaType === "series");
 
-    // Check movies in Radarr
     if (movieItems.length > 0) {
-      const radarrConnectors = getConnectorsByType(
-        "radarr",
-      ) as RadarrConnector[];
-
       for (const connector of radarrConnectors) {
         try {
-          const movies = await connector.getMovies();
+          const movies = await connector.getMovies(undefined, { signal });
 
           for (const item of movieItems) {
             if (!item.tmdbId) continue;
@@ -99,15 +95,10 @@ const checkItemsInLibrary = async (
       }
     }
 
-    // Check series in Sonarr
     if (seriesItems.length > 0) {
-      const sonarrConnectors = getConnectorsByType(
-        "sonarr",
-      ) as SonarrConnector[];
-
       for (const connector of sonarrConnectors) {
         try {
-          const series = await connector.getSeries();
+          const series = await connector.getSeries(undefined, { signal });
 
           for (const item of seriesItems) {
             const matchingShow = series.find(
@@ -159,16 +150,16 @@ const checkItemsInLibrary = async (
   return result;
 };
 
-/**
- * Batch-checks multiple discover items for library presence in a single query.
- * More efficient than useCheckInLibrary for checking multiple items at once.
- */
 export const useBatchCheckInLibrary = (
   items: DiscoverMediaItem[],
 ): UseBatchCheckInLibraryResult => {
-  const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
+  const radarrConnectors = useConnectorsStore(
+    selectConnectorsByType("radarr"),
+  ) as RadarrConnector[];
+  const sonarrConnectors = useConnectorsStore(
+    selectConnectorsByType("sonarr"),
+  ) as SonarrConnector[];
 
-  // Create stable list of check items
   const checkItems = items.map((item) => ({
     id: item.id,
     tmdbId: item.tmdbId,
@@ -181,16 +172,19 @@ export const useBatchCheckInLibrary = (
     queryKey: queryKeys.library.batchCheckInLibrary(
       checkItems.map((item) => `${item.id}`),
     ),
-    queryFn: async () => checkItemsInLibrary(checkItems, getConnectorsByType),
+    queryFn: async ({ signal }) =>
+      checkItemsInLibrary(
+        checkItems,
+        radarrConnectors,
+        sonarrConnectors,
+        signal,
+      ),
     enabled: items.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     retry: 1,
   });
 
-  // Normalize the returned data to always be a Map to avoid callers
-  // assuming a Map and calling .has/.get on something that may be
-  // undefined or a plain object (e.g. from mocks or serialization).
   const safeData = query.data;
   let itemsInLibraryMap: Map<string, FoundService>;
 
@@ -198,7 +192,6 @@ export const useBatchCheckInLibrary = (
     itemsInLibraryMap = safeData;
   } else if (safeData && typeof safeData === "object") {
     try {
-      // If data is a plain object keyed by id, convert to Map
       itemsInLibraryMap = new Map(
         Object.entries(safeData) as [string, FoundService][],
       );

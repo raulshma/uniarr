@@ -86,7 +86,7 @@ export function useServiceMetrics(
 
   return useQuery({
     queryKey,
-    queryFn: async (): Promise<ServiceMetrics> => {
+    queryFn: async ({ signal }): Promise<ServiceMetrics> => {
       return await metricsEngine.calculateMetrics(serviceId, timeRange);
     },
     staleTime: STALE_TIME.LONG, // 5 minutes
@@ -155,7 +155,7 @@ export function useAggregatedMetrics(options: UseAggregatedMetricsOptions) {
 
   return useQuery({
     queryKey,
-    queryFn: async (): Promise<AggregatedMetrics> => {
+    queryFn: async ({ signal }): Promise<AggregatedMetrics> => {
       return await metricsEngine.getAggregatedMetrics(serviceIds, timeRange);
     },
     staleTime: STALE_TIME.LONG,
@@ -218,7 +218,7 @@ export function useMetricHistory(
 
   return useQuery({
     queryKey,
-    queryFn: async (): Promise<MetricDataPoint[]> => {
+    queryFn: async ({ signal }): Promise<MetricDataPoint[]> => {
       return await metricsEngine.getMetricHistory(serviceId, metric, timeRange);
     },
     staleTime: STALE_TIME.LONG,

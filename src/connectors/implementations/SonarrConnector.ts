@@ -11,7 +11,11 @@ import type {
   Series,
   Season,
 } from "@/models/media.types";
-import type { SearchOptions, SystemHealth } from "@/connectors/base/IConnector";
+import type {
+  SearchOptions,
+  SystemHealth,
+  ConnectorRequestOptions,
+} from "@/connectors/base/IConnector";
 import { handleApiError } from "@/utils/error.utils";
 import type { components } from "@/connectors/client-schemas/sonarr-openapi";
 import type { NormalizedRelease } from "@/models/discover.types";
@@ -24,9 +28,6 @@ import type {
   HealthMessageSeverity,
 } from "@/models/logger.types";
 
-// Local aliases for the Sonarr OpenAPI-generated schemas. Using these aliases
-// keeps the rest of the file readable and allows us to change the underlying
-// source of truth without updating every usage site.
 type SonarrEpisode = components["schemas"]["EpisodeResource"];
 type SonarrQuality = components["schemas"]["Quality"];
 type SonarrRelease = components["schemas"]["ReleaseResource"];
@@ -50,10 +51,6 @@ export interface SonarrQueueItem {
   readonly statusMessages?: components["schemas"]["TrackedDownloadStatusMessage"][];
 }
 
-// A number of small local helper interfaces were previously defined here to
-// model Sonarr API responses. We now prefer to use the generated OpenAPI
-// types (aliased above) to avoid drift and duplication.
-
 interface SonarrSeriesEditor {
   readonly seriesIds: number[];
   readonly monitored?: boolean;
@@ -71,8 +68,6 @@ interface SonarrRenameSeriesOptions {
   readonly seriesId: number;
   readonly renameFiles?: boolean;
 }
-
-// SonarrRootFolder mapped via SonarrRootFolder alias above
 
 export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async initialize(): Promise<void> {
@@ -128,7 +123,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         statusText: axiosError?.response?.statusText,
       });
 
-      // Check for network connectivity issues and log at debug level
       if (
         axiosError?.code === "ECONNREFUSED" ||
         axiosError?.code === "ENOTFOUND" ||
@@ -149,9 +143,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  /**
-   * Retrieve health status and messages from Sonarr
-   */
   override async getHealth(): Promise<SystemHealth> {
     try {
       const response =
@@ -161,9 +152,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
       const healthResources = response.data ?? [];
 
-      // Map Sonarr health resources to our HealthMessage format
       const messages: HealthMessage[] = healthResources.map((resource) => {
-        // Map Sonarr's HealthCheckResult to our severity levels
         const severityMap: Record<string, HealthMessageSeverity> = {
           ok: "info",
           notice: "info",
@@ -182,7 +171,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         };
       });
 
-      // Determine overall status based on health messages
       const hasErrors = messages.some((m) => m.severity === "error");
       const hasWarnings = messages.some((m) => m.severity === "warning");
 
@@ -220,11 +208,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getSeries(filters?: {
-    tags?: number[];
-    qualityProfileId?: number;
-    monitored?: boolean;
-  }): Promise<Series[]> {
+  async getSeries(
+    filters?: {
+      tags?: number[];
+      qualityProfileId?: number;
+      monitored?: boolean;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Series[]> {
     try {
       const params: Record<string, unknown> = {};
 
@@ -240,7 +231,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
       const response = await this.client.get<
         components["schemas"]["SeriesResource"][]
-      >("/api/v3/series", { params });
+      >("/api/v3/series", { params, ...this.toAxiosConfig(options) });
       return response.data.map((item) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {
@@ -252,18 +243,23 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async search(query: string, options?: SearchOptions): Promise<Series[]> {
+  async search(
+    query: string,
+    searchOptions?: SearchOptions,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Series[]> {
     try {
       const params: Record<string, unknown> = { term: query };
 
-      if (options?.filters) {
-        Object.assign(params, options.filters);
+      if (searchOptions?.filters) {
+        Object.assign(params, searchOptions.filters);
       }
 
       const response = await this.client.get<
         components["schemas"]["SeriesResource"][]
       >("/api/v3/series/lookup", {
         params,
+        ...this.toAxiosConfig(options),
       });
 
       return response.data.map((item) => this.mapSeries(item));
@@ -277,7 +273,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getById(id: number): Promise<Series> {
+  async getById(
+    id: number,
+    options?: ConnectorRequestOptions,
+  ): Promise<Series> {
     try {
       const [seriesResponse, episodesResponse, episodeFilesResponse] =
         await Promise.all([
@@ -285,25 +284,27 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
             `/api/v3/series/${id}`,
             {
               params: { includeSeasonImages: true },
+              ...this.toAxiosConfig(options),
             },
           ),
           this.client.get<components["schemas"]["EpisodeResource"][]>(
             `/api/v3/episode`,
             {
               params: { seriesId: id, includeImages: true },
+              ...this.toAxiosConfig(options),
             },
           ),
           this.client.get<components["schemas"]["EpisodeFileResource"][]>(
             "/api/v3/episodefile",
             {
               params: { seriesId: id },
+              ...this.toAxiosConfig(options),
             },
           ),
         ]);
 
       const series = this.mapSeries(seriesResponse.data);
 
-      // Create a map of episode files by episodeFileId for quick lookup
       const episodeFilesMap = new Map<
         number,
         components["schemas"]["EpisodeFileResource"]
@@ -320,7 +321,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         episodeFilesMap,
       );
 
-      // Calculate total size on disk
       const totalSizeOnDiskMB = episodeFilesResponse.data.reduce(
         (sum, file) => {
           return sum + (file.size ?? 0) / (1024 * 1024);
@@ -350,12 +350,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async getEpisodeFiles(
     seriesId: number,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<components["schemas"]["EpisodeFileResource"][]> {
     try {
       const response = await this.client.get<
         components["schemas"]["EpisodeFileResource"][]
       >("/api/v3/episodefile", {
         params: { seriesId },
+        ...this.toAxiosConfig(options),
       });
       return response.data;
     } catch (error) {
@@ -368,12 +370,15 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async add(request: AddSeriesRequest): Promise<Series> {
+  async add(
+    request: AddSeriesRequest,
+    options?: ConnectorRequestOptions,
+  ): Promise<Series> {
     try {
       const payload = this.buildAddPayload(request);
       const response = await this.client.post<
         components["schemas"]["SeriesResource"]
-      >("/api/v3/series", payload);
+      >("/api/v3/series", payload, this.toAxiosConfig(options));
       return this.mapSeries(response.data);
     } catch (error) {
       throw handleApiError(error, {
@@ -385,12 +390,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async triggerSearch(seriesId: number): Promise<void> {
+  async triggerSearch(
+    seriesId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v3/command", {
-        name: "SeriesSearch",
-        seriesId,
-      });
+      await this.client.post(
+        "/api/v3/command",
+        {
+          name: "SeriesSearch",
+          seriesId,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -401,12 +413,20 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async setMonitored(seriesId: number, monitored: boolean): Promise<void> {
+  async setMonitored(
+    seriesId: number,
+    monitored: boolean,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v3/series/monitor", {
-        seriesIds: [seriesId],
-        monitored,
-      });
+      await this.client.post(
+        "/api/v3/series/monitor",
+        {
+          seriesIds: [seriesId],
+          monitored,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -421,16 +441,21 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     seriesId: number,
     seasonNumber: number,
     monitored: boolean,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     try {
-      await this.client.put(`/api/v3/series/${seriesId}`, {
-        seasons: [
-          {
-            seasonNumber,
-            monitored,
-          },
-        ],
-      });
+      await this.client.put(
+        `/api/v3/series/${seriesId}`,
+        {
+          seasons: [
+            {
+              seasonNumber,
+              monitored,
+            },
+          ],
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -441,12 +466,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async searchMissingEpisodes(seriesId: number): Promise<void> {
+  async searchMissingEpisodes(
+    seriesId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v3/command", {
-        name: "SeriesSearch",
-        seriesId,
-      });
+      await this.client.post(
+        "/api/v3/command",
+        {
+          name: "SeriesSearch",
+          seriesId,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -461,16 +493,16 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     seriesId: number,
     seasonNumber: number,
     episodeNumber: number,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     try {
-      // Get all episodes for the series to find the specific episode ID
       const episodesResponse = await this.client.get<
         components["schemas"]["EpisodeResource"][]
       >(`/api/v3/episode`, {
         params: { seriesId },
+        ...this.toAxiosConfig(options),
       });
 
-      // Find the episode matching season and episode number
       const episode = episodesResponse.data.find(
         (ep) =>
           ep.seasonNumber === seasonNumber &&
@@ -481,11 +513,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         throw new Error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
       }
 
-      // Search using episodeIds with correct API format
-      await this.client.post("/api/v3/command", {
-        name: "EpisodeSearch",
-        episodeIds: [episode.id],
-      });
+      await this.client.post(
+        "/api/v3/command",
+        {
+          name: "EpisodeSearch",
+          episodeIds: [episode.id],
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -496,12 +531,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async searchEpisodesByIds(episodeIds: number[]): Promise<void> {
+  async searchEpisodesByIds(
+    episodeIds: number[],
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v3/command", {
-        name: "EpisodeSearch",
-        episodeIds,
-      });
+      await this.client.post(
+        "/api/v3/command",
+        {
+          name: "EpisodeSearch",
+          episodeIds,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -517,16 +559,16 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     seasonNumber: number,
     episodeNumber: number,
     monitored: boolean,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     try {
-      // Get all episodes for the series to find the specific episode ID
       const episodesResponse = await this.client.get<
         components["schemas"]["EpisodeResource"][]
       >(`/api/v3/episode`, {
         params: { seriesId },
+        ...this.toAxiosConfig(options),
       });
 
-      // Find the episode matching season and episode number
       const episode = episodesResponse.data.find(
         (ep) =>
           ep.seasonNumber === seasonNumber &&
@@ -537,10 +579,13 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         throw new Error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
       }
 
-      // Update the episode's monitored status
-      await this.client.put(`/api/v3/episode/${episode.id}`, {
-        monitored,
-      });
+      await this.client.put(
+        `/api/v3/episode/${episode.id}`,
+        {
+          monitored,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -551,9 +596,15 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async deleteEpisodeFile(episodeFileId: number): Promise<void> {
+  async deleteEpisodeFile(
+    episodeFileId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.delete(`/api/v3/episodefile/${episodeFileId}`);
+      await this.client.delete(
+        `/api/v3/episodefile/${episodeFileId}`,
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -564,27 +615,32 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async unmonitorAllEpisodes(seriesId: number): Promise<void> {
+  async unmonitorAllEpisodes(
+    seriesId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      // First, get the series to retrieve all seasons
       const seriesResponse = await this.client.get<
         components["schemas"]["SeriesResource"]
-      >(`/api/v3/series/${seriesId}`);
+      >(`/api/v3/series/${seriesId}`, this.toAxiosConfig(options));
 
       const series = seriesResponse.data;
       if (!series.seasons) {
         return;
       }
 
-      // Unmonitor all seasons
       const updatedSeasons = series.seasons.map((season) => ({
         seasonNumber: season.seasonNumber,
         monitored: false,
       }));
 
-      await this.client.put(`/api/v3/series/${seriesId}`, {
-        seasons: updatedSeasons,
-      });
+      await this.client.put(
+        `/api/v3/series/${seriesId}`,
+        {
+          seasons: updatedSeasons,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -597,16 +653,21 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async deleteSeries(
     seriesId: number,
-    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
+    deleteOptions: {
+      deleteFiles?: boolean;
+      addImportListExclusion?: boolean;
+    } = {},
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     try {
       const params = {
-        deleteFiles: options.deleteFiles ?? false,
-        addImportListExclusion: options.addImportListExclusion ?? false,
+        deleteFiles: deleteOptions.deleteFiles ?? false,
+        addImportListExclusion: deleteOptions.addImportListExclusion ?? false,
       };
 
       await this.client.delete(`/api/v3/series/${seriesId}`, {
         params,
+        ...this.toAxiosConfig(options),
       });
     } catch (error) {
       throw handleApiError(error, {
@@ -626,11 +687,12 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         "id" | "seasons" | "statistics"
       >
     >,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<Series> {
     try {
       const response = await this.client.put<
         components["schemas"]["SeriesResource"]
-      >(`/api/v3/series/${seriesId}`, updates);
+      >(`/api/v3/series/${seriesId}`, updates, this.toAxiosConfig(options));
       return this.mapSeries(response.data);
     } catch (error) {
       throw handleApiError(error, {
@@ -642,12 +704,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async refreshSeries(seriesId: number): Promise<void> {
+  async refreshSeries(
+    seriesId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v3/command", {
-        name: "SeriesRefresh",
-        seriesId,
-      });
+      await this.client.post(
+        "/api/v3/command",
+        {
+          name: "SeriesRefresh",
+          seriesId,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -658,12 +727,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async rescanSeries(seriesId: number): Promise<void> {
+  async rescanSeries(
+    seriesId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v3/command", {
-        name: "SeriesRescan",
-        seriesId,
-      });
+      await this.client.post(
+        "/api/v3/command",
+        {
+          name: "SeriesRescan",
+          seriesId,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -674,12 +750,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async moveSeries(options: SonarrMoveSeriesOptions): Promise<void> {
+  async moveSeries(
+    moveOptions: SonarrMoveSeriesOptions,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v3/command", {
-        name: "SeriesMove",
-        ...options,
-      });
+      await this.client.post(
+        "/api/v3/command",
+        {
+          name: "SeriesMove",
+          ...moveOptions,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -690,18 +773,15 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  /**
-   * Get available releases/candidates for a series (from indexers).
-   * Probes multiple candidate endpoints based on Sonarr API versions.
-   */
   async getReleases(
     seriesId: number,
-    options?: {
+    searchOptions?: {
       season?: number;
       episode?: number;
       indexerId?: number;
       minSeeders?: number;
     },
+    options?: { readonly signal?: AbortSignal },
   ): Promise<NormalizedRelease[]> {
     const candidateEndpoints = [
       "/api/v3/release",
@@ -712,25 +792,29 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     for (const endpoint of candidateEndpoints) {
       try {
         const params: Record<string, unknown> = { seriesId };
-        if (options?.season !== undefined) {
-          params.season = options.season;
+        if (searchOptions?.season !== undefined) {
+          params.season = searchOptions.season;
         }
-        if (options?.episode !== undefined) {
-          params.episode = options.episode;
+        if (searchOptions?.episode !== undefined) {
+          params.episode = searchOptions.episode;
         }
-        if (options?.indexerId) {
-          params.indexerId = options.indexerId;
+        if (searchOptions?.indexerId) {
+          params.indexerId = searchOptions.indexerId;
         }
 
         const response = await this.client.get<SonarrRelease[]>(endpoint, {
           params,
+          ...this.toAxiosConfig(options),
         });
 
         if (Array.isArray(response.data)) {
           return response.data
             .filter((r) => {
-              if (options?.minSeeders !== undefined && r.seeders !== null) {
-                return (r.seeders ?? 0) >= options.minSeeders;
+              if (
+                searchOptions?.minSeeders !== undefined &&
+                r.seeders !== null
+              ) {
+                return (r.seeders ?? 0) >= searchOptions.minSeeders;
               }
               return true;
             })
@@ -749,7 +833,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
             seriesId,
           });
         }
-        // Try next candidate endpoint
       }
     }
 
@@ -762,12 +845,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     return [];
   }
 
-  async renameSeries(options: SonarrRenameSeriesOptions): Promise<void> {
+  async renameSeries(
+    renameOptions: SonarrRenameSeriesOptions,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.post("/api/v3/command", {
-        name: "SeriesRename",
-        ...options,
-      });
+      await this.client.post(
+        "/api/v3/command",
+        {
+          name: "SeriesRename",
+          ...renameOptions,
+        },
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -778,12 +868,13 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getTags(): Promise<components["schemas"]["TagResource"][]> {
+  async getTags(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<components["schemas"]["TagResource"][]> {
     try {
-      const response =
-        await this.client.get<components["schemas"]["TagResource"][]>(
-          "/api/v3/tag",
-        );
+      const response = await this.client.get<
+        components["schemas"]["TagResource"][]
+      >("/api/v3/tag", this.toAxiosConfig(options));
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -797,11 +888,12 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async createTag(
     label: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<components["schemas"]["TagResource"]> {
     try {
       const response = await this.client.post<
         components["schemas"]["TagResource"]
-      >("/api/v3/tag", { label });
+      >("/api/v3/tag", { label }, this.toAxiosConfig(options));
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -816,11 +908,16 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async updateTag(
     tagId: number,
     label: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<components["schemas"]["TagResource"]> {
     try {
       const response = await this.client.put<
         components["schemas"]["TagResource"]
-      >(`/api/v3/tag/${tagId}`, { id: tagId, label });
+      >(
+        `/api/v3/tag/${tagId}`,
+        { id: tagId, label },
+        this.toAxiosConfig(options),
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -832,9 +929,15 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async deleteTag(tagId: number): Promise<void> {
+  async deleteTag(
+    tagId: number,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.delete(`/api/v3/tag/${tagId}`);
+      await this.client.delete(
+        `/api/v3/tag/${tagId}`,
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -845,9 +948,16 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async bulkUpdateSeries(editor: SonarrSeriesEditor): Promise<void> {
+  async bulkUpdateSeries(
+    editor: SonarrSeriesEditor,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      await this.client.put("/api/v3/series/editor", editor);
+      await this.client.put(
+        "/api/v3/series/editor",
+        editor,
+        this.toAxiosConfig(options),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -858,7 +968,9 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getQualityProfiles(): Promise<QualityProfile[]> {
+  async getQualityProfiles(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<QualityProfile[]> {
     const candidateEndpoints = [
       "/api/v3/qualityprofile",
       "/api/v3/qualityProfile",
@@ -867,13 +979,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
     for (const endpoint of candidateEndpoints) {
       try {
-        // Attempt endpoint variant
-        const response =
-          await this.client.get<
-            components["schemas"]["QualityProfileResource"][]
-          >(endpoint);
+        const response = await this.client.get<
+          components["schemas"]["QualityProfileResource"][]
+        >(endpoint, this.toAxiosConfig(options));
 
-        // Check if response contains an error
         if (
           response.data &&
           typeof response.data === "object" &&
@@ -886,12 +995,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
         return response.data.map((profile) => this.mapQualityProfile(profile));
       } catch (error) {
-        // If this endpoint returned a 404, try the next candidate.
         const axiosError = error as unknown as {
           response?: { status?: number };
         };
         const status = axiosError?.response?.status;
-        // Only continue trying on 404; for other errors, fail-fast and report diagnostics
         if (status !== 404) {
           const enhancedError = new Error(
             "Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.",
@@ -903,7 +1010,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
             endpoint,
           });
         }
-        // otherwise continue to next candidate
       }
     }
 
@@ -918,12 +1024,13 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     });
   }
 
-  async getRootFolders(): Promise<RootFolder[]> {
+  async getRootFolders(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<RootFolder[]> {
     try {
-      const response =
-        await this.client.get<components["schemas"]["RootFolderResource"][]>(
-          "/api/v3/rootfolder",
-        );
+      const response = await this.client.get<
+        components["schemas"]["RootFolderResource"][]
+      >("/api/v3/rootfolder", this.toAxiosConfig(options));
       return response.data.map((folder) => this.mapRootFolder(folder));
     } catch (error) {
       throw handleApiError(error, {
@@ -939,6 +1046,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     start?: string,
     end?: string,
     unmonitored?: boolean,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<SonarrEpisode[]> {
     try {
       const params: Record<string, unknown> = {
@@ -950,7 +1058,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
       const response = await this.client.get<
         components["schemas"]["EpisodeResource"][]
-      >("/api/v3/calendar", { params });
+      >("/api/v3/calendar", { params, ...this.toAxiosConfig(options) });
       return response.data ?? [];
     } catch (error) {
       throw handleApiError(error, {
@@ -962,12 +1070,13 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getQueue(): Promise<SonarrQueueItem[]> {
+  async getQueue(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<SonarrQueueItem[]> {
     try {
-      const response =
-        await this.client.get<
-          components["schemas"]["QueueResourcePagingResource"]
-        >("/api/v3/queue");
+      const response = await this.client.get<
+        components["schemas"]["QueueResourcePagingResource"]
+      >("/api/v3/queue", this.toAxiosConfig(options));
       return (response.data.records ?? []).map((record) =>
         this.mapQueueRecord(record),
       );
@@ -983,22 +1092,26 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async removeFromQueue(
     id: number,
-    options: {
+    removeOptions: {
       removeFromClient?: boolean;
       blocklist?: boolean;
       skipRedownload?: boolean;
       changeCategory?: boolean;
     } = {},
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     try {
       const params = {
-        removeFromClient: options.removeFromClient ?? true,
-        blocklist: options.blocklist ?? false,
-        skipRedownload: options.skipRedownload ?? false,
-        changeCategory: options.changeCategory ?? false,
+        removeFromClient: removeOptions.removeFromClient ?? true,
+        blocklist: removeOptions.blocklist ?? false,
+        skipRedownload: removeOptions.skipRedownload ?? false,
+        changeCategory: removeOptions.changeCategory ?? false,
       };
 
-      await this.client.delete(`/api/v3/queue/${id}`, { params });
+      await this.client.delete(`/api/v3/queue/${id}`, {
+        params,
+        ...this.toAxiosConfig(options),
+      });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -1011,19 +1124,20 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async bulkRemoveFromQueue(
     ids: number[],
-    options: {
+    removeOptions: {
       removeFromClient?: boolean;
       blocklist?: boolean;
       skipRedownload?: boolean;
       changeCategory?: boolean;
     } = {},
+    options?: { readonly signal?: AbortSignal },
   ): Promise<void> {
     try {
       const params = {
-        removeFromClient: options.removeFromClient ?? true,
-        blocklist: options.blocklist ?? false,
-        skipRedownload: options.skipRedownload ?? false,
-        changeCategory: options.changeCategory ?? false,
+        removeFromClient: removeOptions.removeFromClient ?? true,
+        blocklist: removeOptions.blocklist ?? false,
+        skipRedownload: removeOptions.skipRedownload ?? false,
+        changeCategory: removeOptions.changeCategory ?? false,
       };
 
       const payload = { ids };
@@ -1031,6 +1145,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       await this.client.delete("/api/v3/queue/bulk", {
         params,
         data: payload,
+        ...this.toAxiosConfig(options),
       });
     } catch (error) {
       throw handleApiError(error, {
@@ -1042,24 +1157,25 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getHistory(options?: {
-    page?: number;
-    pageSize?: number;
-  }): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
+  async getHistory(
+    historyOptions?: {
+      page?: number;
+      pageSize?: number;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
     try {
       const params: Record<string, unknown> = {};
-      if (options?.page) params.page = options.page;
-      if (options?.pageSize) params.pageSize = options.pageSize;
-      // Include related data for better UI display
+      if (historyOptions?.page) params.page = historyOptions.page;
+      if (historyOptions?.pageSize) params.pageSize = historyOptions.pageSize;
       params.includeSeries = true;
       params.includeEpisode = true;
-      // Order by most recent first
       params.sortKey = "date";
       params.sortDirection = "descending";
 
       const response = await this.client.get<
         components["schemas"]["HistoryResourcePagingResource"]
-      >("/api/v3/history", { params });
+      >("/api/v3/history", { params, ...this.toAxiosConfig(options) });
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -1071,13 +1187,15 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getEpisodesByIds(episodeIds: number[]): Promise<SonarrEpisode[]> {
+  async getEpisodesByIds(
+    episodeIds: number[],
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<SonarrEpisode[]> {
     try {
       if (!episodeIds || episodeIds.length === 0) {
         return [];
       }
 
-      // Fetch episodes in parallel (max 5 at a time to avoid overwhelming the API)
       const batchSize = 5;
       const episodes: SonarrEpisode[] = [];
 
@@ -1086,7 +1204,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         const results = await Promise.all(
           batch.map((episodeId) =>
             this.client
-              .get<SonarrEpisode>(`/api/v3/episode/${episodeId}`)
+              .get<SonarrEpisode>(
+                `/api/v3/episode/${episodeId}`,
+                this.toAxiosConfig(options),
+              )
               .then((res) => res.data)
               .catch(() => null),
           ),
@@ -1106,11 +1227,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  /**
-   * Retrieve logs from Sonarr using the /api/v3/log endpoint.
-   * Supports pagination, level filtering, and time range filtering.
-   */
-  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+  override async getLogs(
+    options?: LogQueryOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
+  ): Promise<ServiceLog[]> {
     try {
       const params: Record<string, unknown> = {
         pageSize: options?.limit ?? 50,
@@ -1121,23 +1241,18 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         sortDirection: "descending",
       };
 
-      // Add level filter if specified
       if (options?.level && options.level.length > 0) {
-        // Sonarr uses uppercase level names
         params.level = options.level.map((l) => l.toUpperCase()).join(",");
       }
 
-      // Note: Sonarr's /api/v3/log endpoint doesn't support time range filtering via query params
-      // We'll filter by time after fetching if needed
       const response = await this.client.get<
         components["schemas"]["LogResourcePagingResource"]
-      >("/api/v3/log", { params });
+      >("/api/v3/log", { params, ...this.toAxiosConfig(requestOptions) });
 
       const logs = (response.data.records ?? []).map((log) =>
         this.normalizeLogEntry(log),
       );
 
-      // Apply time range filtering if specified
       let filteredLogs = logs;
       if (options?.since || options?.until) {
         filteredLogs = logs.filter((log) => {
@@ -1151,7 +1266,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         });
       }
 
-      // Apply search term filtering if specified
       if (options?.searchTerm) {
         const searchLower = options.searchTerm.toLowerCase();
         filteredLogs = filteredLogs.filter(
@@ -1177,9 +1291,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  /**
-   * Normalize a Sonarr log entry to the unified ServiceLog format.
-   */
   private normalizeLogEntry(
     log: components["schemas"]["LogResource"],
   ): ServiceLog {
@@ -1201,9 +1312,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     };
   }
 
-  /**
-   * Normalize Sonarr log level to the unified ServiceLogLevel format.
-   */
   private normalizeSonarrLogLevel(level?: string | null): ServiceLogLevel {
     if (!level) {
       return "info";
@@ -1333,8 +1441,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     seriesId?: number,
     episodeFilesMap?: Map<number, components["schemas"]["EpisodeFileResource"]>,
   ): Episode {
-    // Try to get poster from images array first (if available in API response)
-    // Try screenshot first as it's more commonly available for episodes
     const posterUrl =
       this.findImageUrl(episode.images ?? undefined, "screenshot") ??
       this.findImageUrl(episode.images ?? undefined, "poster") ??
@@ -1342,12 +1448,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         ? this.buildEpisodePosterUrl(seriesId, episode.id)
         : undefined);
 
-    // Extract size from episodeFile if available (size is in bytes, convert to MB)
     const sizeInMB = episode.episodeFile?.size
       ? episode.episodeFile.size / (1024 * 1024)
       : undefined;
 
-    // Get detailed episode file info from the episodeFilesMap if available
     let detailedEpisodeFile:
       | components["schemas"]["EpisodeFileResource"]
       | undefined;
@@ -1451,7 +1555,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       }
       return url.toString();
     } catch {
-      // Fallback to string concat if URL construction fails for any reason
       return `${
         this.config.url
       }/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg${
@@ -1464,8 +1567,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   private buildEpisodePosterUrl(seriesId: number, episodeId: number): string {
     try {
-      // Try the episode-specific MediaCover endpoint format
-      // Use 'screenshot' as the image type for episodes (most common)
       const url = new URL(
         `/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
         this.config.url,
@@ -1526,7 +1627,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     items: components["schemas"]["QualityProfileQualityItemResource"][] = [],
     qualityId: number,
   ): Quality {
-    // Flatten all qualities from the nested structure
     const allQualities: components["schemas"]["Quality"][] = [];
 
     const processItem = (
@@ -1547,7 +1647,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       return this.mapQualityResource(found);
     }
 
-    // Fallback: create a minimal quality object if not found
     return {
       id: qualityId,
       name: `Quality ${qualityId}`,
@@ -1560,7 +1659,6 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   private mapQualityProfileItem(
     item: components["schemas"]["QualityProfileQualityItemResource"],
   ): QualityProfileItem {
-    // For groups, we need to handle differently, but for now, if no quality, use a placeholder
     const quality =
       (item.quality as components["schemas"]["Quality"] | undefined) ??
       (item as unknown as { quality?: components["schemas"]["Quality"] })

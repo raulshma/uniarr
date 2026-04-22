@@ -69,6 +69,7 @@ const deriveStatus = (
 
 const fetchServiceHealth = async (
   serviceId: string,
+  signal?: AbortSignal,
 ): Promise<ServiceHealthResult> => {
   const manager = ConnectorManager.getInstance();
 
@@ -113,7 +114,7 @@ const fetchServiceHealth = async (
 export const useServiceHealth = (serviceId: string) => {
   return useQuery({
     queryKey: queryKeys.services.health(serviceId),
-    queryFn: () => fetchServiceHealth(serviceId),
+    queryFn: ({ signal }) => fetchServiceHealth(serviceId, signal),
     refetchInterval: 60000, // 60 seconds
     ...getQueryConfig("HEALTH"),
   });

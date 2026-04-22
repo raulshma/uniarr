@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from "react";
-// no direct React hooks used
 import {
   useMutation,
   useQuery,
@@ -10,10 +9,9 @@ import {
 
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
 import type { QBittorrentConnector } from "@/connectors/implementations/QBittorrentConnector";
-import type { IConnector } from "@/connectors/base/IConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 import type { Torrent, TorrentTransferInfo } from "@/models/torrent.types";
 import { isTorrentCompleted } from "@/utils/torrent.utils";
@@ -71,21 +69,6 @@ export interface UseQBittorrentResult {
   transferError: unknown;
 }
 
-const ensureConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): QBittorrentConnector => {
-  const connector = getConnector(serviceId);
-
-  if (!connector || connector.config.type !== QB_SERVICE_TYPE) {
-    throw new Error(
-      `qBittorrent connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as QBittorrentConnector;
-};
-
 export const useQBittorrentTorrents = (
   serviceId: string,
   options: UseQBittorrentOptions = {},
@@ -97,18 +80,14 @@ export const useQBittorrentTorrents = (
     refetchIntervalMs = 10_000,
   } = options;
   const queryClient = useQueryClient();
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === QB_SERVICE_TYPE;
   const previousTorrentsRef = useRef<
     Map<string, { progress: number; state: Torrent["state"] }>
   >(new Map());
   const hasHydratedRef = useRef(false);
 
-  const resolveConnector = useCallback(
-    () => ensureConnector(getConnector, serviceId),
-    [getConnector, serviceId],
-  );
+  const qbConnector = connector as QBittorrentConnector | undefined;
 
   const isEnabled = hasConnector && enabled;
   const pollingInterval =
@@ -116,9 +95,10 @@ export const useQBittorrentTorrents = (
 
   const torrentsQuery = useQuery({
     queryKey: queryKeys.qbittorrent.torrents(serviceId, filters),
-    queryFn: async () => {
-      const connector = resolveConnector();
-      return connector.getTorrents(filters);
+    queryFn: async ({ signal }) => {
+      return (connector as QBittorrentConnector).getTorrents(filters, {
+        signal,
+      });
     },
     enabled: isEnabled,
     refetchInterval: pollingInterval,
@@ -128,9 +108,8 @@ export const useQBittorrentTorrents = (
 
   const transferInfoQuery = useQuery({
     queryKey: queryKeys.qbittorrent.transferInfo(serviceId),
-    queryFn: async () => {
-      const connector = resolveConnector();
-      return connector.getTransferInfo();
+    queryFn: async ({ signal }) => {
+      return (connector as QBittorrentConnector).getTransferInfo({ signal });
     },
     enabled: isEnabled,
     refetchInterval: pollingInterval,
@@ -152,8 +131,7 @@ export const useQBittorrentTorrents = (
   const pauseMutation = useMutation({
     mutationKey: ["qbittorrent", serviceId, "pause"],
     mutationFn: async (hash: string) => {
-      const connector = resolveConnector();
-      await connector.pauseTorrent(hash);
+      await (connector as QBittorrentConnector).pauseTorrent(hash);
     },
     onSuccess: async () => {
       await invalidateData();
@@ -163,8 +141,7 @@ export const useQBittorrentTorrents = (
   const resumeMutation = useMutation({
     mutationKey: ["qbittorrent", serviceId, "resume"],
     mutationFn: async (hash: string) => {
-      const connector = resolveConnector();
-      await connector.resumeTorrent(hash);
+      await (connector as QBittorrentConnector).resumeTorrent(hash);
     },
     onSuccess: async () => {
       await invalidateData();
@@ -180,8 +157,10 @@ export const useQBittorrentTorrents = (
       hash: string;
       deleteFiles?: boolean;
     }) => {
-      const connector = resolveConnector();
-      await connector.deleteTorrent(hash, deleteFiles ?? false);
+      await (connector as QBittorrentConnector).deleteTorrent(
+        hash,
+        deleteFiles ?? false,
+      );
     },
     onSuccess: async () => {
       await invalidateData();
@@ -191,8 +170,7 @@ export const useQBittorrentTorrents = (
   const recheckMutation = useMutation({
     mutationKey: ["qbittorrent", serviceId, "recheck"],
     mutationFn: async (hash: string) => {
-      const connector = resolveConnector();
-      await connector.forceRecheck(hash);
+      await (connector as QBittorrentConnector).forceRecheck(hash);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -210,10 +188,7 @@ export const useQBittorrentTorrents = (
       return;
     }
 
-    const connector = getConnector(serviceId) as
-      | QBittorrentConnector
-      | undefined;
-    const serviceName = connector?.config.name ?? "qBittorrent";
+    const serviceName = qbConnector?.config.name ?? "qBittorrent";
     const previous = previousTorrentsRef.current;
     const hasHydrated = hasHydratedRef.current;
     const nextState = new Map<
@@ -253,7 +228,7 @@ export const useQBittorrentTorrents = (
 
     previousTorrentsRef.current = nextState;
     hasHydratedRef.current = true;
-  }, [hasConnector, getConnector, serviceId, torrents]);
+  }, [hasConnector, connector, serviceId, torrents, qbConnector]);
 
   return {
     torrents,

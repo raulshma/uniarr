@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
@@ -11,10 +10,9 @@ import type { AddMovieRequest, Movie } from "@/models/movie.types";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
-import { IConnector } from "@/connectors/base/IConnector";
 import type { LibraryFilters } from "@/store/libraryFilterStore";
 
 interface UseRadarrMoviesOptions {
@@ -39,32 +37,12 @@ interface UseRadarrMoviesResult {
 
 const RADARR_SERVICE_TYPE = "radarr";
 
-const ensureRadarrConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): RadarrConnector => {
-  const connector = getConnector(serviceId);
-  if (!connector || connector.config.type !== RADARR_SERVICE_TYPE) {
-    throw new Error(
-      `Radarr connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as RadarrConnector;
-};
-
 export const useRadarrMovies = ({
   serviceId,
   filters,
 }: UseRadarrMoviesOptions): UseRadarrMoviesResult => {
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
-
-  const resolveConnector = useCallback(
-    () => ensureRadarrConnector(getConnector, serviceId),
-    [getConnector, serviceId],
-  );
 
   const queryClient = useQueryClient();
 
@@ -73,9 +51,8 @@ export const useRadarrMovies = ({
       serviceId,
       filters as Record<string, unknown> | undefined,
     ),
-    queryFn: async () => {
-      const connector = resolveConnector();
-      return connector.getMovies(filters);
+    queryFn: async ({ signal }) => {
+      return (connector as RadarrConnector).getMovies(filters, { signal });
     },
     enabled: hasConnector,
     staleTime: 5 * 60 * 1000,
@@ -85,8 +62,7 @@ export const useRadarrMovies = ({
   const addMovieMutation = useMutation({
     mutationKey: queryKeys.radarr.moviesList(serviceId),
     mutationFn: async (request: AddMovieRequest) => {
-      const connector = resolveConnector();
-      return connector.add(request);
+      return (connector as RadarrConnector).add(request);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({

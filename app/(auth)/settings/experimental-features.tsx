@@ -35,6 +35,9 @@ const ExperimentalFeaturesScreen = () => {
   const trailerFeatureEnabled = useSettingsStore(
     (s) => s.trailerFeatureEnabled,
   );
+  const experimentalTimelineDashboardEnabled = useSettingsStore(
+    (s) => s.experimentalTimelineDashboardEnabled,
+  );
   const setFrostedWidgetsEnabled = useSettingsStore(
     (s) => s.setFrostedWidgetsEnabled,
   );
@@ -49,6 +52,9 @@ const ExperimentalFeaturesScreen = () => {
   );
   const setTrailerFeatureEnabled = useSettingsStore(
     (s) => s.setTrailerFeatureEnabled,
+  );
+  const setExperimentalTimelineDashboardEnabled = useSettingsStore(
+    (s) => s.setExperimentalTimelineDashboardEnabled,
   );
 
   const handleBackPress = () => {
@@ -84,6 +90,26 @@ const ExperimentalFeaturesScreen = () => {
         onBackPress={handleBackPress}
       />
       <AnimatedScrollView contentContainerStyle={styles.content}>
+        <AnimatedSection style={styles.section} delay={0} animated>
+          <Text style={styles.sectionTitle}>Dashboard</Text>
+          <SettingsGroup>
+            <AnimatedListItem index={0} totalItems={1} animated>
+              <SettingsListItem
+                title="Timeline Dashboard"
+                subtitle="New sidebar-based dashboard with a unified event timeline"
+                left={{ iconName: "timeline-clock-outline" }}
+                trailing={
+                  <Switch
+                    value={experimentalTimelineDashboardEnabled}
+                    onValueChange={setExperimentalTimelineDashboardEnabled}
+                    color={theme.colors.primary}
+                  />
+                }
+                groupPosition="single"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
         <AnimatedSection style={styles.section} delay={0} animated>
           <Text style={styles.sectionTitle}>Appearance</Text>
           <SettingsGroup>

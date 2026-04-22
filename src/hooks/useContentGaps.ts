@@ -80,7 +80,7 @@ export function useContentGaps(
     refetch: queryRefetch,
   } = useQuery({
     queryKey: queryKeys.recommendations.contentGaps(userId),
-    queryFn: async (): Promise<Recommendation[]> => {
+    queryFn: async ({ signal }): Promise<Recommendation[]> => {
       void logger.info("Fetching content gaps via hook", { userId });
 
       return await recommendationService.getContentGaps(userId);

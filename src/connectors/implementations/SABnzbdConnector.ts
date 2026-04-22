@@ -181,36 +181,38 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTorrents(filters?: {
-    category?: string;
-    tag?: string;
-    status?: string;
-  }): Promise<Torrent[]> {
+  async getTorrents(
+    filters?: {
+      category?: string;
+      tag?: string;
+      status?: string;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<Torrent[]> {
     try {
-      // Get queue (active downloads)
       const queueResponse = await this.client.get<SABnzbdQueueResponse>(
         "queue",
         {
           params: { apikey: this.config.apiKey },
+          signal: options?.signal,
         },
       );
 
       const queueItems = queueResponse.data.queue.slots || [];
 
-      // Get history (completed/failed downloads)
       const historyResponse = await this.client.get<SABnzbdHistoryResponse>(
         "history",
         {
           params: {
             apikey: this.config.apiKey,
-            limit: 100, // Get recent history items
+            limit: 100,
           },
+          signal: options?.signal,
         },
       );
 
       const historyItems = historyResponse.data.history.slots || [];
 
-      // Combine queue and history items
       const allItems = [...queueItems, ...historyItems];
 
       return allItems.map((item) => this.mapQueueItem(item));
@@ -224,7 +226,10 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async pauseTorrent(hash: string): Promise<void> {
+  async pauseTorrent(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
       await this.client.get("queue", {
         params: {
@@ -232,6 +237,7 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
           name: "pause",
           value: hash,
         },
+        signal: options?.signal,
       });
     } catch (error) {
       throw handleApiError(error, {
@@ -243,7 +249,10 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async resumeTorrent(hash: string): Promise<void> {
+  async resumeTorrent(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
       await this.client.get("queue", {
         params: {
@@ -251,6 +260,7 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
           name: "resume",
           value: hash,
         },
+        signal: options?.signal,
       });
     } catch (error) {
       throw handleApiError(error, {
@@ -262,7 +272,11 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
+  async deleteTorrent(
+    hash: string,
+    deleteFiles = false,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
       await this.client.get("queue", {
         params: {
@@ -271,6 +285,7 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
           value: hash,
           ...(deleteFiles && { del_files: 1 }),
         },
+        signal: options?.signal,
       });
     } catch (error) {
       throw handleApiError(error, {
@@ -282,15 +297,18 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async forceRecheck(hash: string): Promise<void> {
+  async forceRecheck(
+    hash: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<void> {
     try {
-      // SABnzbd doesn't have a direct recheck, but we can retry the download
       await this.client.get("queue", {
         params: {
           apikey: this.config.apiKey,
           name: "retry",
           value: hash,
         },
+        signal: options?.signal,
       });
     } catch (error) {
       throw handleApiError(error, {
@@ -302,10 +320,13 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTransferInfo(): Promise<TorrentTransferInfo> {
+  async getTransferInfo(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<TorrentTransferInfo> {
     try {
       const response = await this.client.get<SABnzbdQueueResponse>("queue", {
         params: { apikey: this.config.apiKey },
+        signal: options?.signal,
       });
 
       const queue = response.data.queue;

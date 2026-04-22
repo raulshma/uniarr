@@ -81,14 +81,12 @@ export function useLogPatterns(options: UseLogPatternsOptions = {}) {
 
   return useQuery({
     queryKey,
-    queryFn: async (): Promise<LogPattern[]> => {
-      // Fetch logs for analysis
+    queryFn: async ({ signal }): Promise<LogPattern[]> => {
       const aggregatedLogs = await logService.fetchLogs(
         serviceIds,
         queryOptions,
       );
 
-      // Analyze patterns
       let patterns = await logService.analyzePatterns(aggregatedLogs.logs);
 
       // Filter by minimum count

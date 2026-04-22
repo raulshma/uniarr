@@ -182,6 +182,8 @@ export class TmdbConnector {
 
   private readonly useBearerAuth: boolean;
 
+  private disposed = false;
+
   constructor(credential: string) {
     if (!credential || !credential.trim()) {
       throw new Error("TMDB credential is required");
@@ -190,6 +192,13 @@ export class TmdbConnector {
     this.credential = normalizeCredential(credential);
     this.useBearerAuth = looksLikeV4Token(this.credential);
     this.client = this.createHttpClient();
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.client.interceptors.request.clear();
+    this.client.interceptors.response.clear();
   }
 
   private createHttpClient(): AxiosInstance {
@@ -231,9 +240,13 @@ export class TmdbConnector {
   private async requestWithRetry<T>(
     config: AxiosRequestConfig,
     attempt = 0,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<AxiosResponse<T>> {
     try {
-      return await this.client.request<T>({ ...config });
+      return await this.client.request<T>({
+        ...config,
+        signal: options?.signal,
+      });
     } catch (error) {
       if (isAxiosError(error)) {
         const status = error.response?.status ?? 0;
@@ -251,7 +264,7 @@ export class TmdbConnector {
             setTimeout(resolve, delay);
           });
 
-          return this.requestWithRetry<T>(config, attempt + 1);
+          return this.requestWithRetry<T>(config, attempt + 1, options);
         }
       }
 
@@ -363,14 +376,20 @@ export class TmdbConnector {
     return Object.fromEntries(entries) as TParams;
   }
 
-  async validateApiKey(): Promise<ValidateApiKeyResult> {
+  async validateApiKey(options?: {
+    readonly signal?: AbortSignal;
+  }): Promise<ValidateApiKeyResult> {
     try {
       await this.requestWithRetry<
         operations["authentication-validate-key"]["responses"][200]["content"]["application/json"]
-      >({
-        method: "GET",
-        url: "/3/authentication",
-      });
+      >(
+        {
+          method: "GET",
+          url: "/3/authentication",
+        },
+        0,
+        options,
+      );
 
       return { ok: true };
     } catch (error) {
@@ -394,13 +413,18 @@ export class TmdbConnector {
 
   async discoverMovies(
     params: DiscoverMovieQuery = {},
+    options?: { readonly signal?: AbortSignal },
   ): Promise<DiscoverMovieResponse> {
     try {
-      const response = await this.requestWithRetry<DiscoverMovieResponse>({
-        method: "GET",
-        url: "/3/discover/movie",
-        params: this.removeUndefined(params),
-      });
+      const response = await this.requestWithRetry<DiscoverMovieResponse>(
+        {
+          method: "GET",
+          url: "/3/discover/movie",
+          params: this.removeUndefined(params),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -408,13 +432,22 @@ export class TmdbConnector {
     }
   }
 
-  async discoverTv(params: DiscoverTvQuery = {}): Promise<DiscoverTvResponse> {
+  async discoverTv(
+    params: DiscoverTvQuery = {},
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<DiscoverTvResponse> {
     try {
-      const response = await this.requestWithRetry<DiscoverTvResponse>({
-        method: "GET",
-        url: "/3/discover/tv",
-        params: this.removeUndefined(params),
-      });
+      const response = await this.requestWithRetry<DiscoverTvResponse>(
+        {
+          method: "GET",
+          url: "/3/discover/tv",
+          params: this.removeUndefined(params),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -425,17 +458,22 @@ export class TmdbConnector {
   async getGenres(
     mediaType: TmdbMediaType,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<GenreMovieResponse | GenreTvResponse> {
     try {
       const url =
         mediaType === "movie" ? "/3/genre/movie/list" : "/3/genre/tv/list";
       const response = await this.requestWithRetry<
         GenreMovieResponse | GenreTvResponse
-      >({
-        method: "GET",
-        url,
-        params: this.removeUndefined({ language }),
-      });
+      >(
+        {
+          method: "GET",
+          url,
+          params: this.removeUndefined({ language }),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -447,16 +485,19 @@ export class TmdbConnector {
     mediaType: "movie",
     tmdbId: number,
     options?: GetDetailsOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<MovieDetailsWithExtrasResponse>;
   async getDetails(
     mediaType: "tv",
     tmdbId: number,
     options?: GetDetailsOptions,
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<TvDetailsWithExtrasResponse>;
   async getDetails(
     mediaType: TmdbMediaType,
     tmdbId: number,
     options: GetDetailsOptions = {},
+    requestOptions?: { readonly signal?: AbortSignal },
   ): Promise<MovieDetailsWithExtrasResponse | TvDetailsWithExtrasResponse> {
     try {
       const url =
@@ -464,17 +505,21 @@ export class TmdbConnector {
       const { language, appendToResponse, includeVideoLanguage } = options;
       const response = await this.requestWithRetry<
         MovieDetailsResponse | TvDetailsResponse
-      >({
-        method: "GET",
-        url,
-        params: this.removeUndefined({
-          language,
-          append_to_response: appendToResponse?.length
-            ? appendToResponse.join(",")
-            : undefined,
-          include_video_language: includeVideoLanguage,
-        }),
-      });
+      >(
+        {
+          method: "GET",
+          url,
+          params: this.removeUndefined({
+            language,
+            append_to_response: appendToResponse?.length
+              ? appendToResponse.join(",")
+              : undefined,
+            include_video_language: includeVideoLanguage,
+          }),
+        },
+        0,
+        requestOptions,
+      );
 
       return response.data as
         | MovieDetailsWithExtrasResponse
@@ -488,16 +533,19 @@ export class TmdbConnector {
     mediaType: "movie",
     tmdbId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<MovieImagesResponse>;
   async getImages(
     mediaType: "tv",
     tmdbId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<TvImagesResponse>;
   async getImages(
     mediaType: TmdbMediaType,
     tmdbId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<MovieImagesResponse | TvImagesResponse> {
     try {
       const url =
@@ -506,11 +554,15 @@ export class TmdbConnector {
           : `/3/tv/${tmdbId}/images`;
       const response = await this.requestWithRetry<
         MovieImagesResponse | TvImagesResponse
-      >({
-        method: "GET",
-        url,
-        params: this.removeUndefined({ language }),
-      });
+      >(
+        {
+          method: "GET",
+          url,
+          params: this.removeUndefined({ language }),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -521,14 +573,17 @@ export class TmdbConnector {
   async getWatchProviders(
     mediaType: "movie",
     tmdbId: number,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<MovieWatchProvidersResponse>;
   async getWatchProviders(
     mediaType: "tv",
     tmdbId: number,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<TvWatchProvidersResponse>;
   async getWatchProviders(
     mediaType: TmdbMediaType,
     tmdbId: number,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<MovieWatchProvidersResponse | TvWatchProvidersResponse> {
     try {
       const url =
@@ -537,10 +592,14 @@ export class TmdbConnector {
           : `/3/tv/${tmdbId}/watch/providers`;
       const response = await this.requestWithRetry<
         MovieWatchProvidersResponse | TvWatchProvidersResponse
-      >({
-        method: "GET",
-        url,
-      });
+      >(
+        {
+          method: "GET",
+          url,
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -552,16 +611,19 @@ export class TmdbConnector {
     mediaType: "movie",
     tmdbId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<MovieVideosResponse>;
   async getVideos(
     mediaType: "tv",
     tmdbId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<TvVideosResponse>;
   async getVideos(
     mediaType: TmdbMediaType,
     tmdbId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<MovieVideosResponse | TvVideosResponse> {
     try {
       const url =
@@ -570,11 +632,15 @@ export class TmdbConnector {
           : `/3/tv/${tmdbId}/videos`;
       const response = await this.requestWithRetry<
         MovieVideosResponse | TvVideosResponse
-      >({
-        method: "GET",
-        url,
-        params: this.removeUndefined({ language }),
-      });
+      >(
+        {
+          method: "GET",
+          url,
+          params: this.removeUndefined({ language }),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -582,17 +648,26 @@ export class TmdbConnector {
     }
   }
 
-  async searchMulti(params: SearchMultiQuery): Promise<SearchMultiResponse> {
+  async searchMulti(
+    params: SearchMultiQuery,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<SearchMultiResponse> {
     if (!params || typeof params.query !== "string" || !params.query.trim()) {
       throw new TmdbConnectorError("Search query is required.", 400);
     }
 
     try {
-      const response = await this.requestWithRetry<SearchMultiResponse>({
-        method: "GET",
-        url: "/3/search/multi",
-        params: this.removeUndefined(params),
-      });
+      const response = await this.requestWithRetry<SearchMultiResponse>(
+        {
+          method: "GET",
+          url: "/3/search/multi",
+          params: this.removeUndefined(params),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -604,13 +679,18 @@ export class TmdbConnector {
   async getPersonDetails(
     personId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<PersonDetailsResponse> {
     try {
-      const response = await this.requestWithRetry<PersonDetailsResponse>({
-        method: "GET",
-        url: `/3/person/${personId}`,
-        params: this.removeUndefined({ language }),
-      });
+      const response = await this.requestWithRetry<PersonDetailsResponse>(
+        {
+          method: "GET",
+          url: `/3/person/${personId}`,
+          params: this.removeUndefined({ language }),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -621,13 +701,18 @@ export class TmdbConnector {
   async getPersonMovieCredits(
     personId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<PersonMovieCreditsResponse> {
     try {
-      const response = await this.requestWithRetry<PersonMovieCreditsResponse>({
-        method: "GET",
-        url: `/3/person/${personId}/movie_credits`,
-        params: this.removeUndefined({ language }),
-      });
+      const response = await this.requestWithRetry<PersonMovieCreditsResponse>(
+        {
+          method: "GET",
+          url: `/3/person/${personId}/movie_credits`,
+          params: this.removeUndefined({ language }),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -638,13 +723,18 @@ export class TmdbConnector {
   async getPersonTvCredits(
     personId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<PersonTvCreditsResponse> {
     try {
-      const response = await this.requestWithRetry<PersonTvCreditsResponse>({
-        method: "GET",
-        url: `/3/person/${personId}/tv_credits`,
-        params: this.removeUndefined({ language }),
-      });
+      const response = await this.requestWithRetry<PersonTvCreditsResponse>(
+        {
+          method: "GET",
+          url: `/3/person/${personId}/tv_credits`,
+          params: this.removeUndefined({ language }),
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -655,14 +745,19 @@ export class TmdbConnector {
   async getPersonCombinedCredits(
     personId: number,
     language?: string,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<PersonCombinedCreditsResponse> {
     try {
       const response =
-        await this.requestWithRetry<PersonCombinedCreditsResponse>({
-          method: "GET",
-          url: `/3/person/${personId}/combined_credits`,
-          params: this.removeUndefined({ language }),
-        });
+        await this.requestWithRetry<PersonCombinedCreditsResponse>(
+          {
+            method: "GET",
+            url: `/3/person/${personId}/combined_credits`,
+            params: this.removeUndefined({ language }),
+          },
+          0,
+          options,
+        );
 
       return response.data;
     } catch (error) {
@@ -670,12 +765,21 @@ export class TmdbConnector {
     }
   }
 
-  async getPersonImages(personId: number): Promise<PersonImagesResponse> {
+  async getPersonImages(
+    personId: number,
+    options?: {
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<PersonImagesResponse> {
     try {
-      const response = await this.requestWithRetry<PersonImagesResponse>({
-        method: "GET",
-        url: `/3/person/${personId}/images`,
-      });
+      const response = await this.requestWithRetry<PersonImagesResponse>(
+        {
+          method: "GET",
+          url: `/3/person/${personId}/images`,
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {
@@ -685,12 +789,17 @@ export class TmdbConnector {
 
   async getPersonExternalIds(
     personId: number,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<PersonExternalIdsResponse> {
     try {
-      const response = await this.requestWithRetry<PersonExternalIdsResponse>({
-        method: "GET",
-        url: `/3/person/${personId}/external_ids`,
-      });
+      const response = await this.requestWithRetry<PersonExternalIdsResponse>(
+        {
+          method: "GET",
+          url: `/3/person/${personId}/external_ids`,
+        },
+        0,
+        options,
+      );
 
       return response.data;
     } catch (error) {

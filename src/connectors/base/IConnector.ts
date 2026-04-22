@@ -21,6 +21,16 @@ export interface SearchOptions {
   };
   /** Optional flag to request cached results where the service supports it. */
   readonly skipCache?: boolean;
+  /** Optional AbortSignal for request cancellation. */
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Common request options for connector operations.
+ */
+export interface ConnectorRequestOptions {
+  /** Optional AbortSignal for request cancellation. */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -85,16 +95,29 @@ export interface IConnector<
   search?(query: string, options?: SearchOptions): Promise<TResource[]>;
 
   /** Optional detail fetcher for retrieving a single resource by identifier. */
-  getById?(id: string | number): Promise<TResource>;
+  getById?(
+    id: string | number,
+    options?: ConnectorRequestOptions,
+  ): Promise<TResource>;
 
   /** Optional create method for provisioning new resources. */
-  add?(item: TCreatePayload): Promise<TResource>;
+  add?(
+    item: TCreatePayload,
+    options?: ConnectorRequestOptions,
+  ): Promise<TResource>;
 
   /** Optional update method for modifying an existing resource. */
-  update?(id: string | number, data: TUpdatePayload): Promise<TResource>;
+  update?(
+    id: string | number,
+    data: TUpdatePayload,
+    options?: ConnectorRequestOptions,
+  ): Promise<TResource>;
 
   /** Optional delete method for removing a resource from the remote service. */
-  delete?(id: string | number): Promise<boolean>;
+  delete?(
+    id: string | number,
+    options?: ConnectorRequestOptions,
+  ): Promise<boolean>;
 
   /** Optional method to retrieve logs from the service. */
   getLogs?(options?: LogQueryOptions): Promise<ServiceLog[]>;

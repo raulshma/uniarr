@@ -270,6 +270,18 @@ export class NetworkScannerService {
     }
   }
 
+  private async getAdaptiveConcurrency(): Promise<number> {
+    try {
+      const netInfo = await NetInfo.fetch();
+      if (netInfo.type === "cellular") {
+        return 10;
+      }
+      return 20;
+    } catch {
+      return 15;
+    }
+  }
+
   private async scanServiceType(
     serviceType: ServiceType,
     config: ServiceDetectionConfig,
@@ -281,7 +293,7 @@ export class NetworkScannerService {
   ): Promise<DiscoveredService[]> {
     const discoveredServices: DiscoveredService[] = [];
     const hosts = this.generateHostIps(subnet);
-    const CONCURRENT_REQUESTS = 30; // Increased concurrency for faster scanning
+    const CONCURRENT_REQUESTS = await this.getAdaptiveConcurrency();
 
     for (const port of config.commonPorts) {
       if (this.abortController?.signal.aborted) {
@@ -651,12 +663,20 @@ export class NetworkScannerService {
       }
     }
 
-    // Execute all priority scans concurrently
-    const results = await Promise.allSettled(allPromises);
+    const PRIORITY_BATCH_SIZE = await this.getAdaptiveConcurrency();
 
-    for (const result of results) {
-      if (result.status === "fulfilled" && result.value) {
-        discoveredServices.push(result.value);
+    for (let i = 0; i < allPromises.length; i += PRIORITY_BATCH_SIZE) {
+      if (this.abortController?.signal.aborted) {
+        break;
+      }
+
+      const batch = allPromises.slice(i, i + PRIORITY_BATCH_SIZE);
+      const batchResults = await Promise.allSettled(batch);
+
+      for (const result of batchResults) {
+        if (result.status === "fulfilled" && result.value) {
+          discoveredServices.push(result.value);
+        }
       }
     }
 

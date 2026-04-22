@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/queryKeys";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
@@ -21,41 +21,37 @@ interface UseRadarrFilterMetadataOptions {
   serviceId: string;
 }
 
-/**
- * Hook to fetch and store filter metadata for Sonarr
- */
 export const useSonarrFilterMetadata = ({
   serviceId,
 }: UseSonarrFilterMetadataOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const setMetadata = useLibraryFilterStore((state) => state.setMetadata);
 
-  const connector = getConnector(serviceId) as SonarrConnector | undefined;
+  const sonarrConnector = connector as SonarrConnector | undefined;
   const isValidConnector = connector?.config.type === "sonarr";
 
   const tagsQuery = useQuery({
     queryKey: queryKeys.sonarr.tags(serviceId),
-    queryFn: async () => {
-      if (!connector) throw new Error("Connector not available");
-      return connector.getTags();
-    },
-    enabled: isValidConnector,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false,
-  });
-
-  const qualityProfilesQuery = useQuery({
-    queryKey: queryKeys.sonarr.qualityProfiles(serviceId),
-    queryFn: async () => {
-      if (!connector) throw new Error("Connector not available");
-      return connector.getQualityProfiles();
+    queryFn: async ({ signal }) => {
+      if (!sonarrConnector) throw new Error("Connector not available");
+      return sonarrConnector.getTags({ signal });
     },
     enabled: isValidConnector,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  // Update store when data is loaded
+  const qualityProfilesQuery = useQuery({
+    queryKey: queryKeys.sonarr.qualityProfiles(serviceId),
+    queryFn: async ({ signal }) => {
+      if (!sonarrConnector) throw new Error("Connector not available");
+      return sonarrConnector.getQualityProfiles({ signal });
+    },
+    enabled: isValidConnector,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
     if (tagsQuery.data && qualityProfilesQuery.data) {
       const metadata: FilterMetadata = {
@@ -81,41 +77,37 @@ export const useSonarrFilterMetadata = ({
   };
 };
 
-/**
- * Hook to fetch and store filter metadata for Radarr
- */
 export const useRadarrFilterMetadata = ({
   serviceId,
 }: UseRadarrFilterMetadataOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const setMetadata = useLibraryFilterStore((state) => state.setMetadata);
 
-  const connector = getConnector(serviceId) as RadarrConnector | undefined;
+  const radarrConnector = connector as RadarrConnector | undefined;
   const isValidConnector = connector?.config.type === "radarr";
 
   const tagsQuery = useQuery({
     queryKey: queryKeys.radarr.tags(serviceId),
-    queryFn: async () => {
-      if (!connector) throw new Error("Connector not available");
-      return connector.getTags();
-    },
-    enabled: isValidConnector,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false,
-  });
-
-  const qualityProfilesQuery = useQuery({
-    queryKey: queryKeys.radarr.qualityProfiles(serviceId),
-    queryFn: async () => {
-      if (!connector) throw new Error("Connector not available");
-      return connector.getQualityProfiles();
+    queryFn: async ({ signal }) => {
+      if (!radarrConnector) throw new Error("Connector not available");
+      return radarrConnector.getTags({ signal });
     },
     enabled: isValidConnector,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  // Update store when data is loaded
+  const qualityProfilesQuery = useQuery({
+    queryKey: queryKeys.radarr.qualityProfiles(serviceId),
+    queryFn: async ({ signal }) => {
+      if (!radarrConnector) throw new Error("Connector not available");
+      return radarrConnector.getQualityProfiles({ signal });
+    },
+    enabled: isValidConnector,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
     if (tagsQuery.data && qualityProfilesQuery.data) {
       const metadata: FilterMetadata = {
