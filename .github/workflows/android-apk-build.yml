@@ -83,7 +83,7 @@ jobs:
 
       - name: Create GitHub Release with APK
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: "UniArr v${{ steps.package_version.outputs.version }}"
           tag_name: "v${{ steps.package_version.outputs.version }}"
@@ -92,5 +92,4 @@ jobs:
             - Version: v${{ steps.package_version.outputs.version }}
             - Commit: ${{ github.sha }}
           files: ./release/app-release.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+          token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
